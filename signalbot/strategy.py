@@ -108,8 +108,9 @@ def enrich(df: pd.DataFrame, p: Params) -> pd.DataFrame:
     d["rsi"] = rsi(d["close"], p.rsi_n)
     d["dc_high"], d["dc_low"] = donchian(d, p.donchian)
     d.attrs["vol_mult"] = p.vol_mult
-    from . import scalping
+    from . import scalping, smc
     scalping.add_indicators(d, intraday=p.intraday or p.timed)
+    smc.add_indicators(d, intraday=p.intraday or p.timed)
     d["uptrend"] = d["close"] > d["ema_trend"]
     d["downtrend"] = d["close"] < d["ema_trend"]
     return d
@@ -131,8 +132,8 @@ def signals(d: pd.DataFrame, setup: str) -> pd.Series:
         buy = d["uptrend"] & (d["close"] > d["dc_high"]) & hot
         sell = d["downtrend"] & (d["close"] < d["dc_low"]) & hot
     else:
-        from . import scalping
-        buy, sell = scalping.signals(d, setup)
+        from . import scalping, smc
+        buy, sell = (smc.signals(d, setup) if setup in smc.SETUPS else scalping.signals(d, setup))
     out = pd.Series(0, index=d.index, dtype=int)
     out[buy.fillna(False)] = 1
     out[sell.fillna(False)] = -1
@@ -155,8 +156,9 @@ def p_vol_mult(d: pd.DataFrame) -> float:
 
 
 from .scalping import SETUPS as _SCALP, TEXT as _SCALP_TEXT  # noqa: E402
+from .smc import SETUPS as _SMC, TEXT as _SMC_TEXT  # noqa: E402
 
-SETUPS = ("breakout", "pullback", "volume breakout") + _SCALP
+SETUPS = ("breakout", "pullback", "volume breakout") + _SCALP + _SMC
 SETUP_TEXT = {
     "breakout": "Trend breakout — in an uptrend (close above the 200-bar EMA), buy a close "
                 "above the previous 20 bars' high; mirror for shorts in a downtrend.",
@@ -166,6 +168,7 @@ SETUP_TEXT = {
                        "at least 1.5× its 20-candle average volume (COMEX gold futures; live tick volume "
                        "when COMEX hasn't printed yet). Mirror for shorts.",
     **_SCALP_TEXT,
+    **_SMC_TEXT,
 }
 
 
@@ -304,8 +307,8 @@ def current(d: pd.DataFrame, setup: str, p: Params, trades: list[Trade]) -> Sign
                          f" on ≥{p.vol_mult:g}× average volume" if setup == "volume breakout" else ""),
                      "stop": lvl + p.stop_atr * a, "target": lvl - p.target_atr * a}
     elif setup != "pullback":
-        from . import scalping
-        watch = scalping.watch(setup, d, p)
+        from . import scalping, smc
+        watch = smc.watch(setup, d, p) if setup in smc.SETUPS else scalping.watch(setup, d, p)
     else:
         lvl = float(last["ema_pull"])
         if bool(last["uptrend"]):

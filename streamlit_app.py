@@ -22,6 +22,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 ROOT = Path(__file__).resolve().parent
+os.environ.setdefault("SIGNALBOT_LIGHT_BACKFILL", "1")   # Streamlit's disk starts empty: download a lighter history first
 
 st.set_page_config(page_title="signalbot", page_icon="🟡", layout="wide",
                    initial_sidebar_state="collapsed")

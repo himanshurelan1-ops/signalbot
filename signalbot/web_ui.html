@@ -161,11 +161,12 @@
       <span id="px" class="px">—</span>
       <span id="tickState" class="tickstate">connecting to the live feed…</span>
       <span id="volNow" class="tickstate"></span>
-      <button class="ghost fsbtn" id="fsBtn" title="Full screen (F) — Esc to exit">⛶ Full screen</button>
+      <label class="tog" style="margin-left:auto" title="previous-day high/low, Asian range, equal highs/lows, fair value gaps, order blocks, sweeps, structure breaks"><input type="checkbox" id="smcTog"> Liquidity / SMC</label>
+      <button class="ghost fsbtn" id="fsBtn" title="Full screen (F) — Esc to exit" style="margin-left:0">⛶ Full screen</button>
     </div>
     <div id="verdict" class="verdict wait"><b class="h">…</b><div class="d"></div><div class="now"></div><div class="meta"></div></div>
     <div id="chart"></div>
-    <div class="tickstate" style="margin-top:6px">Session strip (top of chart): <b style="color:#7c3aed">Asia</b> 05:30–12:30 IST · <b style="color:#2563eb">London</b> 12:30–17:30 · <b style="color:#0f9d58">London + NY</b> 17:30–21:30 (most liquid) · <b style="color:#ea580c">New York</b> 21:30–02:30 · <b style="color:#6b7280">after hours</b> 02:30–05:30.<br>Volume pane: <b style="color:#0f9d58">bars</b> = COMEX gold futures contracts per candle (solid = ≥1.5× the 20-candle average, faded = normal; ~10 min delayed) · <b style="color:#2563eb">blue line</b> = live tick volume (price updates per candle, counts up as ticks arrive)</div>
+    <div class="tickstate" style="margin-top:6px">Session strip (top of chart): <b style="color:#7c3aed">Asia</b> 05:30–12:30 IST · <b style="color:#2563eb">London</b> 12:30–17:30 · <b style="color:#0f9d58">London + NY</b> 17:30–21:30 (most liquid) · <b style="color:#ea580c">New York</b> 21:30–02:30 · <b style="color:#6b7280">after hours</b> 02:30–05:30.<br>Liquidity / SMC: <b style="color:#0f9d58">green</b> / <b style="color:#d93025">red</b> line pairs = unfilled bullish / bearish fair value gaps · <b style="color:#7c3aed">purple</b> pairs = order blocks · <b style="color:#f59e0b">orange</b> = equal highs/lows (resting stops) and <b style="color:#f59e0b">● sweep</b> marks · <b style="color:#0ea5e9">blue</b> = previous day high/low · arrows = latest BOS/CHoCH.<br>Volume pane: <b style="color:#0f9d58">bars</b> = COMEX gold futures contracts per candle (solid = ≥1.5× the 20-candle average, faded = normal; ~10 min delayed) · <b style="color:#2563eb">blue line</b> = live tick volume (price updates per candle, counts up as ticks arrive)</div>
   </div>
 
   <div id="main"><div class="skel">Loading history…</div></div>
@@ -248,6 +249,8 @@ async function init(){
   }
   $('#refresh').onclick = () => load(true);
   $('#fsBtn').onclick = toggleFullscreen;
+  $('#smcTog').checked = localStorage.getItem('sb.smc') !== '0';
+  $('#smcTog').onchange = e => { localStorage.setItem('sb.smc', e.target.checked ? '1' : '0'); if (curRep) drawChart(curRep); };
   $('#qBtn').onclick = searchMarkets;
   $('#q').addEventListener('keydown', e => { if (e.key === 'Enter') searchMarkets(); });
   $('#addPanel').addEventListener('click', e => {
@@ -581,6 +584,24 @@ function verdict(st){
   return ' — coin-flip here, no edge';
 }
 
+function smcCard(rep){
+  const S = rep.smc;
+  if (!S || S.error) return '';
+  const lvls = arr => arr.length ? arr.map(x => `<b>${fmt(x.price)}</b> <span class="status">${x.name}</span>`).join(' · ') : '<span class="status">none nearby</span>';
+  const zones = (arr, name) => arr.length ? arr.map(z => `<span style="color:${z.kind==='bull'?'var(--buy)':'var(--sell)'}">${z.kind === 'bull' ? 'bullish' : 'bearish'} ${name} ${fmt(z.bottom)}–${fmt(z.top)}</span>`).join('<br>') : `<span class="status">no open ${name}s</span>`;
+  const b = S.last_break;
+  return `<div class="card" style="margin-bottom:16px"><h3>Liquidity &amp; structure</h3>
+    <p class="rule">Where the resting stops are, and how price is building. These are ideas, not signals. Whether trading them has paid on this market is on the scoreboard (liquidity sweep, PDH/PDL sweep, Asian range sweep, FVG retest, order block, CHoCH).</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:0">
+      <div><div class="status" style="margin:0">market structure</div><b style="font-size:18px;color:${S.structure==='up'?'var(--buy)':S.structure==='down'?'var(--sell)':'var(--mute)'}">${S.structure === 'up' ? '▲ higher highs / lows' : S.structure === 'down' ? '▼ lower highs / lows' : 'unclear'}</b>
+        ${b ? `<div style="font-size:13px;margin-top:4px">last break: <b>${b.kind}</b> ${b.side} through ${fmt(b.price)}</div>` : ''}</div>
+      <div><div class="status" style="margin:0">liquidity above (buy stops)</div><div style="font-size:13px">${lvls(S.above || [])}</div>
+        <div class="status" style="margin:6px 0 0">liquidity below (sell stops)</div><div style="font-size:13px">${lvls(S.below || [])}</div></div>
+      <div><div class="status" style="margin:0">fair value gaps (unfilled)</div><div style="font-size:13px">${zones(S.fvgs || [], 'FVG')}</div>
+        <div class="status" style="margin:6px 0 0">order blocks (active)</div><div style="font-size:13px">${zones(S.obs || [], 'OB')}</div></div>
+    </div></div>`;
+}
+
 function patternCard(rep){
   const P = rep.patterns || {}, T = rep.trendlines || {};
   const f = P.forming;
@@ -632,8 +653,15 @@ function paintLiveTrigger(){
   const el = $('#verdict .now'); if (!el) return;
   const v = curRep && curRep.verdict;
   if (!v || !['wait', 'running'].includes(v.state) || lastPx == null) { el.textContent = ''; return; }
-  const hit = (v.triggers || []).find(t => (t.kind === 'above' && lastPx > t.price) || (t.kind === 'below' && lastPx < t.price));
+  const hit = (v.triggers || []).find(t => (t.kind === 'above' && lastPx > t.price) || (t.kind === 'below' && lastPx < t.price)
+                                          || (t.kind === 'sweep' && (t.side === 'SELL' ? lastPx > t.price : lastPx < t.price)));
   if (!hit) { el.textContent = ''; return; }
+  if (hit.kind === 'sweep') {
+    const now = Date.now(), left = Math.max(0, Math.round((closesAt(bucketOf(now, curRep.tf), curRep.tf) - now) / 1000));
+    el.style.color = hit.side === 'BUY' ? 'var(--buy)' : 'var(--sell)';
+    el.textContent = `⚡ price ${fmtPx(lastPx)} is sweeping ${fmtPx(hit.price)} (${hit.setup}) — a ${hit.side} fires only if this candle closes back ${hit.side === 'SELL' ? 'below' : 'above'} it · closes in ${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}`;
+    return;
+  }
   const now = Date.now(), left = Math.max(0, Math.round((closesAt(bucketOf(now, curRep.tf), curRep.tf) - now) / 1000));
   el.style.color = hit.side === 'BUY' ? 'var(--buy)' : 'var(--sell)';
   el.textContent = `⚡ price ${fmtPx(lastPx)} is ${hit.kind} the ${hit.side} trigger ${fmtPx(hit.price)} (${hit.setup}) — a ${hit.side} fires only if this candle CLOSES ${hit.kind} it · closes in ${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}`;
@@ -658,7 +686,7 @@ function scoreboardCard(rep){
       <td>${r.max_dd_r.toFixed(1)}R</td><td class="${cls(r.recent_avg_r)}">${r2s(r.recent_avg_r)} <span style="color:var(--mute)">(${r.recent_n})</span></td></tr>`;
   }).join('');
   return `<div class="card" style="margin-bottom:16px"><h3>Strategy scoreboard · ${rep.name} ${rep.tf_label}</h3>
-    <p class="rule">Every rule replayed on all ${rep.history.bars.toLocaleString('en-IN')} candles (market hours only), ranked by average result per trade <b>after a ${fmtPx(rep.params.cost)} spread</b>.
+    <p class="rule">Every rule replayed on all ${rep.history.bars.toLocaleString('en-IN')} candles (market hours only), ranked by average result per trade <b>after a ${Number(Number(rep.params.cost).toPrecision(3))} spread</b>.
     Green = positive edge, red = loses money here. "Last 30 days" shows whether the edge is still working. Grey rows have under 30 trades, too few to judge. Click a row for its card.</p>
     <div class="tscroll"><table class="sb"><tr><th>#</th><th>rule</th><th>now</th><th>trades</th><th>won</th><th>avg / trade</th><th>profit factor</th><th>worst drawdown</th><th>last 30 days</th></tr>${body}</table></div></div>`;
 }
@@ -749,6 +777,7 @@ function render(rep){
     </div>`;
   $('#main').innerHTML = `
     ${scoreboardCard(rep)}
+    ${smcCard(rep)}
     <div class="head">
       <b>${rep.name}</b>
       <span>${fmt(rep.last_close)} <span style="color:var(--mute)">last ${rep.tf_label.toLowerCase()} close ${rep.as_of}</span></span>
@@ -860,6 +889,27 @@ function drawChart(rep){
     if (idx < 0) continue;
     markers.push({time: barTimes[idx], position: 'aboveBar', shape: 'square',
                   color: e.impact === 'High' ? '#d93025' : '#f59e0b', text: '📰 ' + e.title.slice(0, 22)});
+  }
+  // liquidity / smart-money overlays
+  const S = rep.smc || {};
+  if ($('#smcTog').checked && !S.error) {
+    const lvl = (price, color, title, style = 2) => price != null && cs.priceLines.push(candles.createPriceLine({price, color, lineWidth: 1, lineStyle: style, axisLabelVisible: false, title}));
+    if (rep.intraday) { lvl(S.pdh, '#0ea5e9', 'PDH'); lvl(S.pdl, '#0ea5e9', 'PDL'); }
+    for (const pl of (S.pools || [])) lvl(pl.price, '#f59e0b', pl.kind + ' liquidity', 1);
+    const zone = (z, color, label) => {
+      if (z.t < firstT) return;
+      for (const [v, ttl] of [[z.top, ''], [z.bottom, '']]) {          // colours carry the meaning; key under the chart
+        const sr = chart.addLineSeries({color, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false, title: ttl});
+        sr.setData([{time: z.t, value: v}, {time: lastBar.time, value: v}]);
+        cs.extras.push(sr);
+      }
+    };
+    for (const g of (S.fvgs || [])) zone(g, g.kind === 'bull' ? 'rgba(15,157,88,.45)' : 'rgba(217,48,37,.45)', 'FVG');
+    for (const z of (S.obs || [])) zone(z, 'rgba(124,58,237,.55)', z.kind === 'bull' ? 'bull OB' : 'bear OB');
+    for (const w of (S.sweeps || []).slice(-3)) if (w.t >= firstT)
+      markers.push({time: w.t, position: w.side === 'BUY' ? 'belowBar' : 'aboveBar', color: '#f59e0b', shape: 'circle', size: 0.6, text: 'sweep'});
+    const b = S.last_break;
+    if (b && b.t >= firstT) markers.push({time: b.t, position: b.side === 'up' ? 'belowBar' : 'aboveBar', color: b.side === 'up' ? '#0f9d58' : '#d93025', shape: b.side === 'up' ? 'arrowUp' : 'arrowDown', text: b.kind});
   }
   markers.sort((a,b) => (a.time > b.time) - (a.time < b.time));
   candles.setMarkers(markers);

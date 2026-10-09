@@ -63,7 +63,7 @@ def verdict(setups: list[dict], d: pd.DataFrame, cal: dict, tf: str) -> dict:
         w = s["signal"].get("watch") or {}
         if w.get("trigger") is None or s["signal"]["status"] != "none":
             continue
-        kind = ("above" if w["side"] == "BUY" else "below") if s["setup"] in _LEVEL_RULES else "ema"
+        kind = w.get("kind") or (("above" if w["side"] == "BUY" else "below") if s["setup"] in _LEVEL_RULES else "ema")
         key = (w["side"], round(float(w["trigger"]) / max(float(d["atr"].iloc[-1]), 1e-9) * 10))
         if key in seen:
             continue
@@ -101,6 +101,9 @@ def verdict(setups: list[dict], d: pd.DataFrame, cal: dict, tf: str) -> dict:
         parts.append(f"BUY if a {label} candle closes above {fmt(buy['price'])} ({buy['setup']})")
     if sell:
         parts.append(f"SELL if one closes below {fmt(sell['price'])} ({sell['setup']})")
+    swp = next((t for t in triggers if t["kind"] == "sweep"), None)
+    if swp:
+        parts.append(f"{swp['side']} on a sweep of {pf(swp['price'])} ({swp['setup']}: wick through, close back)")
     ema = next((t for t in triggers if t["kind"] == "ema"), None)
     if ema:
         parts.append(f"{ema['side']} on a pullback through the 20 EMA ≈ {fmt(ema['price'])}")
@@ -192,6 +195,25 @@ def scoreboard(setups: list[dict], d: pd.DataFrame, recent_days: int = 30) -> li
                      "recent_win": (sum(1 for r in rr if r > 0) / len(rr)) if rr else None})
     rows.sort(key=lambda r: (r["trades"] >= 30, r["avg_r"]), reverse=True)
     return rows
+
+
+def _smc_levels(d: pd.DataFrame, tf: str) -> dict:
+    """Liquidity pools, gaps, order blocks, structure and recent sweeps, with chart times."""
+    try:
+        from . import smc
+        lv = smc.levels(d)
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+    idx = d.index
+    t = lambda i: _t(idx[min(int(i), len(idx) - 1)], tf)
+    for k in ("pools", "fvgs", "obs"):
+        for z in lv[k]:
+            z["t"] = t(z.pop("from_i"))
+    for z in lv["sweeps"]:
+        z["t"] = t(z.pop("i"))
+    if lv["last_break"]:
+        lv["last_break"]["t"] = t(lv["last_break"].pop("i"))
+    return lv
 
 
 def _volume_series(d: pd.DataFrame, n: int, tf: str) -> dict:
@@ -344,6 +366,7 @@ def build(symbol: str, root: Path, tf: str = "1d", *, params: Params | None = No
         "setups": setups,
         "verdict": _enrich_verdict(verdict(setups, d, cal, tf), setups, symbol, root, tf, d),
         "scoreboard": _sb,
+        "smc": _smc_levels(d, tf),
         "chart": {"bars": _bars(d, n, tf), "ema_trend": _line(d, "ema_trend", n, tf),
                   "ema_pull": _line(d, "ema_pull", n, tf), **_volume_series(d, n, tf)},
         "volume": _volume_latest(d),

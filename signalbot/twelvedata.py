@@ -224,9 +224,19 @@ def market_hours_only(df: pd.DataFrame, interval: str, kind: str = "metal") -> p
 def backfill(root: Path, interval: str, symbol: str = SYMBOL) -> pd.DataFrame:
     """Years of history on first use, paging backwards 5,000 bars at a time."""
     frames, end = [], None
-    pages = BACKFILL_PAGES if symbol == SYMBOL else NEW_MARKET_PAGES
+    light = os.environ.get("SIGNALBOT_LIGHT_BACKFILL") == "1"        # set by streamlit_app.py: fast cold starts
+    pages = BACKFILL_PAGES if (symbol == SYMBOL and not light) else NEW_MARKET_PAGES
     for _ in range(pages[interval]):
-        df = time_series(root, interval, MAX_OUT, end=end, symbol=symbol)
+        try:
+            df = time_series(root, interval, MAX_OUT, end=end, symbol=symbol)
+        except LimitReached as e:
+            if "minute" not in str(e).lower() or frames:
+                if frames:
+                    break                                # keep what we have; the cache grows later
+                raise
+            log.info("per-minute limit hit during backfill — waiting a minute")
+            time.sleep(61)                               # the key is shared (e.g. Mac + cloud): wait and retry once
+            df = time_series(root, interval, MAX_OUT, end=end, symbol=symbol)
         if df.empty:
             break
         frames.append(df)

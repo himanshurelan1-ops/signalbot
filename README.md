@@ -48,6 +48,14 @@ Or double-click **Open signalbot.command**.
 | **supertrend flip** | Supertrend (10, 3) flipping in the direction of the trend. |
 | **vwap reclaim** | A close back above the day's VWAP (resets 05:30 IST) after a close below it, with the trend. |
 | **london breakout** | First close beyond the Asian range (05:30–12:30 IST) during 12:30–15:30 IST; one trade a day. |
+| **liquidity sweep** | A wick through the latest swing high (low) that closes back inside: stops got run, trade the reversal. Each level once. |
+| **pdh/pdl sweep** | The same at the previous day's high / low; first sweep of each per day. |
+| **asian range sweep** | London (12:30–15:30 IST) wicks beyond the Asian range and closes back inside (the "Judas swing"). |
+| **fvg retest** | With the trend, price dips into an unfilled fair value gap and closes back out of it on a candle in the trend's colour. |
+| **order block** | A displacement candle (body ≥ 1.5 ATR) marks the last opposite candle as an order block; the first retest that holds, with the trend. |
+| **choch** | Change of character: after lower highs, the first close above the last swing high (and mirror). |
+
+The **Liquidity / SMC** switch on the chart draws the previous day's high/low, equal highs/lows, unfilled fair value gaps, active order blocks, recent sweeps and the last BOS/CHoCH; the *Liquidity & structure* card lists the nearest liquidity above and below price.
 
 **Spread.** Every backtested trade pays a round-trip spread (default $0.30, editable in the toolbar), because scalping results without costs flatter every rule.
 
@@ -147,6 +155,7 @@ signalbot/live.py         the forming candle, from 1-minute bars + the minute in
 signalbot/stream.py       Twelve Data live tick stream (WebSocket) → page (SSE) + 1-minute bars with tick volume
 signalbot/volume.py       COMEX futures volume (Yahoo) + tick volume, relative volume
 signalbot/symbols.py      the market list, kinds, spreads, price decimals
+signalbot/smc.py          liquidity sweeps, FVGs, order blocks, market structure (BOS/CHoCH)
 signalbot/scalping.py     EMA cross, MACD, RSI, Bollinger squeeze, Supertrend, VWAP, London breakout
 signalbot/news.py         ForexFactory calendar → events + no-trade windows
 signalbot/patterns.py     swing pivots, candlestick + chart patterns, each with its record
@@ -156,5 +165,5 @@ signalbot/strategy.py     setups, bar-by-bar backtest, stats, current signal
 signalbot/report.py       everything the page / alerts need
 signalbot/web.py + web_ui.html   local page
 signalbot/notify.py       Telegram + de-duplication (state/sent.json)
-tests/                    51 tests, synthetic data, no network
+tests/                    56 tests, synthetic data, no network
 ```
