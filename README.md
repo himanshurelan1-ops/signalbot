@@ -61,6 +61,24 @@ The **Liquidity / SMC** switch on the chart draws the previous day's high/low, e
 
 **Timeframes.** 1m, 5m, 15m, 1H and 1D come from Twelve Data. 30m, 4H and 1W are built from 15m, 1H and 1D candles (4H on the UTC grid like TradingView, weeks start Monday), so they cost no extra credits. The 1-minute chart uses the shared 1-minute cache, deepened once a day to about a week of candles (2 credits). On Streamlit Cloud, watching 1m pulls the newest minute about once a minute (1 credit each), so leave it on 5m or higher when you are not scalping.
 
+**Channels, wedges and Fibonacci.** On every timeframe, signalbot fits a channel through swing highs and lows at three sizes: minor (3 bars each side of a swing), intermediate (8) and major (21). It labels each one: rising, falling or sideways channel, falling or rising wedge, triangle, or broadening. They are drawn as shaded bands (grey, blue and navy), and a dashed centre line means the edge just broke. The Fib toggle draws the retracement of the last swing of 3 ATR or more: 23.6, 38.2, 50, 61.8 and 78.6%, with the 50–61.8% golden zone in gold and the 127% and 162% extensions as targets. Two new rules are backtested like the rest:
+- *wedge breakout*: a close out of a wedge or triangle.
+- *fib golden zone*: the first candle that dips into the 50–78.6% retracement and closes back past 61.8%.
+
+On gold, wedge breakouts have been slightly positive on most timeframes and best on 4H and daily. The golden zone on its own has lost a little on 5m to 1H.
+
+**Confirmation checklist.** Under the banner, eight independent checks are scored for each side:
+1. higher-timeframe trend
+2. trend on this chart
+3. market structure
+4. Fibonacci golden zone
+5. at a channel edge
+6. recent liquidity sweep
+7. rules agreeing
+8. volume
+
+5 or more on one side, with 2 or fewer on the other, reads "strong". It is a checklist, not a backtested rule.
+
 **Market hours only.** Twelve Data keeps publishing XAU/USD candles over the weekend and in the daily 17:00–18:00 New York break: synthetic, flat prices with about $0.25 of jitter. They were about 30% of the 5-minute history, so signalbot drops every candle from when gold isn't trading (Fri 17:00 → Sun 18:00 New York, plus the daily break).
 
 **Layout.** The chart is at the top, with all eight timeframe buttons on it. The verdict banner, rule settings, scoreboard and cards are below.

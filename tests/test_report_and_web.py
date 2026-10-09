@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from signalbot import data, report, scalping, smc, web
+from signalbot import data, report, scalping, smc, structures, web
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def offline(tmp_path, monkeypatch):
 def test_report_builds_from_cache_without_network(offline):
     rep = report.build("XAUUSD", offline, refresh=False)
     assert rep["symbol"] == "XAUUSD" and rep["history"]["bars"] == 1500
-    assert {s["setup"] for s in rep["setups"]} == {"breakout", "pullback", "volume breakout", "trendline break", "channel bounce"} | set(scalping.SETUPS) | set(smc.SETUPS)
+    assert {s["setup"] for s in rep["setups"]} == {"breakout", "pullback", "volume breakout", "trendline break", "channel bounce"} | set(scalping.SETUPS) | set(smc.SETUPS) | set(structures.SETUPS)
     assert "forming" in rep["patterns"] and "lines" in rep["trendlines"]
     for s in rep["setups"]:
         assert s["signal"]["status"] in ("signal", "open", "none")
@@ -46,7 +46,7 @@ def test_report_builds_from_cache_without_network(offline):
 def test_intraday_timeframe_carries_positions_and_labels_times(offline):
     rep = report.build("XAUUSD", offline, "15m", refresh=False)
     assert rep["intraday"] and not rep["flat_by_close"]                 # gold runs round the clock
-    assert {s["setup"] for s in rep["setups"]} == {"breakout", "pullback", "volume breakout", "trendline break", "channel bounce"} | set(scalping.SETUPS) | set(smc.SETUPS)
+    assert {s["setup"] for s in rep["setups"]} == {"breakout", "pullback", "volume breakout", "trendline break", "channel bounce"} | set(scalping.SETUPS) | set(smc.SETUPS) | set(structures.SETUPS)
     assert len(rep["as_of"]) == 16                                       # date AND time, not just the date
     assert isinstance(rep["chart"]["bars"][0]["time"], int)          # epoch seconds for intraday
 

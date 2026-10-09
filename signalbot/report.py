@@ -181,6 +181,81 @@ def _enrich_verdict(v: dict, setups: list[dict], symbol: str, root: Path, tf: st
     return v
 
 
+def confirmation(d: pd.DataFrame, setups: list[dict], struct: dict, smc_lv: dict, tr: dict, tf: str) -> dict:
+    """An 8-point checklist for each side — the independent things a careful trader looks for before
+    pulling the trigger. Each check is shown so you can see what is and isn't lined up."""
+    last = d.iloc[-1]
+    c, a = float(last["close"]), float(last["atr"])
+    higher = {"1m": ["5m", "15m"], "5m": ["15m", "1h"], "15m": ["1h", "1d"], "30m": ["1h", "1d"],
+              "1h": ["1d"], "4h": ["1d"], "1d": [], "1w": []}[tf]
+    fib = struct.get("fib")
+    chans = struct.get("channels") or []
+    sweeps = [x for x in (smc_lv.get("sweeps") or []) if x.get("i", -99) >= len(d) - 10]
+    out = {}
+    for side in ("BUY", "SELL"):
+        up = side == "BUY"
+        want = "up" if up else "down"
+        hk = [tr.get(h) for h in higher if tr.get(h)]
+        checks = []
+
+        def add(name, ok, why):
+            checks.append({"check": name, "ok": bool(ok), "why": why})
+        add("higher timeframes", hk and all(x == want for x in hk),
+            ("200 EMA trend " + ", ".join(f"{h.upper()} {tr.get(h) or '?'}" for h in higher)) if higher else "no higher timeframe")
+        add("trend on this chart", bool(last["uptrend"]) == up, f"price {'above' if last['uptrend'] else 'below'} the 200 EMA")
+        add("market structure", smc_lv.get("structure") == want, f"structure {smc_lv.get('structure', 'unclear')}")
+        g = fib and fib["dir"] == want and fib["in_golden"]
+        add("fib golden zone", g, (f"{fib['depth']:.0%} into the last {fib['dir']} swing" if fib else "no clean swing to measure"))
+        near = []
+        for ch in chans:
+            lvl = ch["lower_now"] if up else ch["upper_now"]
+            if lvl is not None and abs(c - lvl) <= 0.5 * a:
+                near.append(f"{ch['scale']} {ch['shape'] or 'line'}")
+        add("at channel " + ("support" if up else "resistance"), near, ", ".join(near) or "not near a channel edge")
+        sw = [x for x in sweeps if x["side"] == side]
+        add("liquidity sweep", sw, f"swept {sw[-1]['price']:,.2f} in the last 10 candles" if sw else "no recent sweep")
+        mine = [s["setup"] for s in setups if s["signal"]["status"] in ("signal", "open") and s["signal"]["side"] == side]
+        theirs = [s["setup"] for s in setups if s["signal"]["status"] in ("signal", "open") and s["signal"]["side"] != side and s["signal"]["side"]]
+        add("rules agree", mine and len(mine) > len(theirs), f"{len(mine)} for · {len(theirs)} against")
+        rv = last.get("rvol")
+        rv = rv if rv == rv and rv is not None else last.get("rvol_tick")
+        bull = last["close"] >= last["open"]
+        add("volume", rv == rv and rv is not None and rv >= 1.3 and bull == up,
+            f"last candle {float(rv):.1f}× average volume" if rv == rv and rv is not None else "no volume data")
+        out[side] = {"score": sum(x["ok"] for x in checks), "of": len(checks), "checks": checks}
+    b, s_ = out["BUY"]["score"], out["SELL"]["score"]
+    if b >= 5 and s_ <= 2:
+        out["call"], out["side"] = "strong BUY confirmation", "BUY"
+    elif s_ >= 5 and b <= 2:
+        out["call"], out["side"] = "strong SELL confirmation", "SELL"
+    elif b >= 4 and b - s_ >= 2:
+        out["call"], out["side"] = "leaning BUY", "BUY"
+    elif s_ >= 4 and s_ - b >= 2:
+        out["call"], out["side"] = "leaning SELL", "SELL"
+    else:
+        out["call"], out["side"] = "no confirmation either way", None
+    return out
+
+
+def _structures_out(st: dict, d: pd.DataFrame, tf: str) -> dict:
+    idx = d.index
+    step = (idx[-1] - idx[-2]) if len(idx) > 1 else pd.Timedelta(days=1)
+
+    def t(i):
+        i = int(i)
+        return _t(idx[i], tf) if i < len(idx) else _t(idx[-1] + step * (i - len(idx) + 1), tf)
+    chans = []
+    for ch in st.get("channels", []):
+        c2 = dict(ch, edges=[])
+        for e in ch["edges"]:
+            c2["edges"].append(dict(e, **{"from": dict(e["from"], t=t(e["from"]["i"])), "to": dict(e["to"], t=t(e["to"]["i"]))}))
+        chans.append(c2)
+    fib = st.get("fib")
+    if fib:
+        fib = dict(fib, from_t=t(fib["from_i"]), to_t=t(fib["to_i"]), end_t=t(len(idx) - 1 + 3))
+    return {"channels": chans, "fib": fib}
+
+
 def scoreboard(setups: list[dict], d: pd.DataFrame, recent_days: int = 30) -> list[dict]:
     """Every rule ranked by its average result per trade (after costs), with its last-30-days record."""
     cutoff = str((d.index[-1] - pd.Timedelta(days=recent_days)))[:16]
@@ -196,6 +271,14 @@ def scoreboard(setups: list[dict], d: pd.DataFrame, recent_days: int = 30) -> li
                      "recent_win": (sum(1 for r in rr if r > 0) / len(rr)) if rr else None})
     rows.sort(key=lambda r: (r["trades"] >= 30, r["avg_r"]), reverse=True)
     return rows
+
+
+def _smc_raw(d: pd.DataFrame) -> dict:
+    try:
+        from . import smc
+        return smc.levels(d)
+    except Exception:
+        return {}
 
 
 def _smc_levels(d: pd.DataFrame, tf: str) -> dict:
@@ -309,6 +392,16 @@ def build(symbol: str, root: Path, tf: str = "1d", *, params: Params | None = No
     except Exception as e:
         lines_out = {"lines": [], "channel": False, "events": [], "error": f"{type(e).__name__}: {e}"}
 
+    # channels / wedges at three swing sizes, Fibonacci, and their two rules
+    try:
+        from . import structures
+        st = structures.analyse(d, p, long_only=long_only)
+        for blk in st["setups"]:
+            blk["caveat"] = caveat
+        setups += st["setups"]
+    except Exception as e:
+        st = {"channels": [], "fib": None, "error": f"{type(e).__name__}: {e}"}
+
     # classical patterns: what formed, what is forming, and each one's record here
     try:
         pats = P.analyse(raw)
@@ -365,9 +458,11 @@ def build(symbol: str, root: Path, tf: str = "1d", *, params: Params | None = No
         "history": {"from": str(d.index[0])[:10], "bars": int(len(d)), "days": n_days},
         "params": asdict(p), "long_only": long_only,
         "setups": setups,
-        "verdict": _enrich_verdict(verdict(setups, d, cal, tf), setups, symbol, root, tf, d),
+        "verdict": (vd := _enrich_verdict(verdict(setups, d, cal, tf), setups, symbol, root, tf, d)),
         "scoreboard": _sb,
-        "smc": _smc_levels(d, tf),
+        "smc": (smc_out := _smc_levels(d, tf)),
+        "structures": _structures_out(st, d, tf),
+        "confirm": confirmation(d, setups, st, _smc_raw(d), vd.get("trends", {}), tf),
         "chart": {"bars": _bars(d, n, tf), "ema_trend": _line(d, "ema_trend", n, tf),
                   "ema_pull": _line(d, "ema_pull", n, tf), **_volume_series(d, n, tf)},
         "volume": _volume_latest(d),

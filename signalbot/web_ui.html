@@ -73,6 +73,12 @@
   .verdict .now{margin-top:5px;font-size:13px;font-weight:700}
   .verdict .meta{margin-top:6px;font-size:12.5px;color:#4b5563;display:flex;flex-wrap:wrap;gap:4px 16px}
   .verdict .meta .warn{color:var(--sell);font-weight:700}
+  .verdict .conf{margin-top:7px;font-size:13px}
+  .verdict .conf summary{margin:0;color:#374151}
+  .verdict .conf .ck{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:2px 18px;margin-top:6px;font-size:12.5px}
+  .ck .y{color:var(--buy)}.ck .n{color:#9ca3af}
+  .confbar{display:inline-block;width:64px;height:7px;border-radius:4px;background:#e5e7eb;vertical-align:middle;margin:0 6px;overflow:hidden}
+  .confbar i{display:block;height:100%}
   .tr-up{color:var(--buy);font-weight:700}.tr-down{color:var(--sell);font-weight:700}
   table.sb td,table.sb th{padding:6px 8px}
   table.sb tr.row{cursor:pointer}
@@ -149,12 +155,14 @@
       <span id="px" class="px">—</span>
       <span id="tickState" class="tickstate">connecting to the live feed…</span>
       <span id="volNow" class="tickstate"></span>
-      <label class="tog" style="margin-left:auto" title="previous-day high/low, Asian range, equal highs/lows, fair value gaps, order blocks, sweeps, structure breaks"><input type="checkbox" id="smcTog"> Liquidity / SMC</label>
+      <label class="tog" style="margin-left:auto" title="channels and wedges through minor, intermediate and major swings"><input type="checkbox" id="chTog"> Channels</label>
+      <label class="tog" title="Fibonacci retracement of the last swing: golden zone 50–61.8%, targets 127% / 162%"><input type="checkbox" id="fibTog"> Fib</label>
+      <label class="tog" title="previous-day high/low, Asian range, equal highs/lows, fair value gaps, order blocks, sweeps, structure breaks"><input type="checkbox" id="smcTog"> Liquidity / SMC</label>
       <button class="ghost fsbtn" id="fsBtn" title="Full screen (F) — Esc to exit" style="margin-left:0">⛶ Full screen</button>
     </div>
     <div id="chart"></div>
-    <div id="verdict" class="verdict wait" style="margin:10px 0 4px"><b class="h">…</b><div class="d"></div><div class="now"></div><div class="meta"></div></div>
-    <details class="key"><summary>Chart key — sessions, liquidity / SMC, volume</summary><div class="tickstate" style="margin-top:6px">Session strip (top of chart): <b style="color:#7c3aed">Asia</b> 05:30–12:30 IST · <b style="color:#2563eb">London</b> 12:30–17:30 · <b style="color:#0f9d58">London + NY</b> 17:30–21:30 (most liquid) · <b style="color:#ea580c">New York</b> 21:30–02:30 · <b style="color:#6b7280">after hours</b> 02:30–05:30.<br>Liquidity / SMC: <b style="color:#0f9d58">green</b> / <b style="color:#d93025">red</b> line pairs = unfilled bullish / bearish fair value gaps · <b style="color:#7c3aed">purple</b> pairs = order blocks · <b style="color:#f59e0b">orange</b> = equal highs/lows (resting stops) and <b style="color:#f59e0b">● sweep</b> marks · <b style="color:#0ea5e9">blue</b> = previous day high/low · arrows = latest BOS/CHoCH.<br>Volume pane: <b style="color:#0f9d58">bars</b> = COMEX gold futures contracts per candle (solid = ≥1.5× the 20-candle average, faded = normal; ~10 min delayed) · <b style="color:#2563eb">blue line</b> = live tick volume (price updates per candle, counts up as ticks arrive)</div></details>
+    <div id="verdict" class="verdict wait" style="margin:10px 0 4px"><b class="h">…</b><div class="d"></div><div class="now"></div><div class="conf"></div><div class="meta"></div></div>
+    <details class="key"><summary>Chart key — sessions, liquidity / SMC, volume</summary><div class="tickstate" style="margin-top:6px">Session strip (top of chart): <b style="color:#7c3aed">Asia</b> 05:30–12:30 IST · <b style="color:#2563eb">London</b> 12:30–17:30 · <b style="color:#0f9d58">London + NY</b> 17:30–21:30 (most liquid) · <b style="color:#ea580c">New York</b> 21:30–02:30 · <b style="color:#6b7280">after hours</b> 02:30–05:30.<br>Liquidity / SMC: <b style="color:#0f9d58">green</b> / <b style="color:#d93025">red</b> line pairs = unfilled bullish / bearish fair value gaps · <b style="color:#7c3aed">purple</b> pairs = order blocks · <b style="color:#f59e0b">orange</b> = equal highs/lows (resting stops) and <b style="color:#f59e0b">● sweep</b> marks · <b style="color:#0ea5e9">blue</b> = previous day high/low · arrows = latest BOS/CHoCH.<br>Channels: shaded bands through swing highs/lows — <b style="color:#64748b">grey</b> minor (3-bar swings), <b style="color:#2563eb">blue</b> intermediate (8), <b style="color:#1e3a8a">navy</b> major (21); dashed centre line = broken. Fib: <b style="color:#d97706">gold</b> = 50% / 61.8% golden zone, grey = 23.6 / 38.2 / 78.6%, <b style="color:#0f9d58">green</b> = 127% / 162% targets.<br>Volume pane: <b style="color:#0f9d58">bars</b> = COMEX gold futures contracts per candle (solid = ≥1.5× the 20-candle average, faded = normal; ~10 min delayed) · <b style="color:#2563eb">blue line</b> = live tick volume (price updates per candle, counts up as ticks arrive)</div></details>
   </div>
 
   <div style="display:flex;gap:16px;flex-wrap:wrap;margin:0 0 10px;font-size:12px;color:var(--mute)"><span id="ltp" style="font-weight:700;color:var(--ink)"></span><span id="live"></span></div>
@@ -253,6 +261,10 @@ async function init(){
   }
   $('#refresh').onclick = () => load(true);
   $('#fsBtn').onclick = toggleFullscreen;
+  for (const [id, key] of [['#chTog', 'sb.ch'], ['#fibTog', 'sb.fib']]) {
+    $(id).checked = localStorage.getItem(key) !== '0';
+    $(id).onchange = e => { localStorage.setItem(key, e.target.checked ? '1' : '0'); if (curRep) drawChart(curRep); };
+  }
   $('#smcTog').checked = localStorage.getItem('sb.smc') !== '0';
   $('#smcTog').onchange = e => { localStorage.setItem('sb.smc', e.target.checked ? '1' : '0'); if (curRep) drawChart(curRep); };
   $('#qBtn').onclick = searchMarkets;
@@ -592,6 +604,41 @@ function verdict(st){
   return ' — coin-flip here, no edge';
 }
 
+function confHtml(C){
+  if (!C || !C.BUY) return '';
+  const bar = (x, col) => `<span class="confbar"><i style="width:${Math.round(100 * x.score / x.of)}%;background:${col}"></i></span>`;
+  const col = C.side === 'BUY' ? 'var(--buy)' : C.side === 'SELL' ? 'var(--sell)' : '#4b5563';
+  const list = side => C[side].checks.map(k => `<div><span class="${k.ok ? 'y' : 'n'}">${k.ok ? '✓' : '·'}</span> <b>${k.check}</b> <span class="status" style="margin-left:2px">${k.why}</span></div>`).join('');
+  return `<details><summary><b>Confirmation:</b> BUY <b>${C.BUY.score}/${C.BUY.of}</b>${bar(C.BUY, 'var(--buy)')} SELL <b>${C.SELL.score}/${C.SELL.of}</b>${bar(C.SELL, 'var(--sell)')} → <b style="color:${col}">${C.call}</b></summary>
+    <div class="ck"><div><b class="tr-up">BUY checklist</b>${list('BUY')}</div><div><b class="tr-down">SELL checklist</b>${list('SELL')}</div></div>
+    <p class="rule" style="margin:6px 0 0">A checklist, not a rule: it counts how many independent things line up (trend, structure, Fibonacci, channel edge, liquidity sweep, rules, volume). 5+ on one side with 2 or fewer on the other = strong. The rules it draws on have their own backtested records on the scoreboard.</p></details>`;
+}
+
+function structCard(rep){
+  const S = rep.structures; if (!S) return '';
+  const chs = (S.channels || []).map(c => {
+    const e = side => c.edges.find(x => x.side === side);
+    const u = e('upper'), l = e('lower');
+    const edge = (x, nm) => x ? `${nm} <b>${fmt(x.now)}</b> <span class="status">${x.touches} touches${x.broken ? ' · <b style="color:var(--accent)">broken</b>' : ''}</span>` : '';
+    return `<div style="margin-top:6px"><b>${c.scale}</b> <span class="status">(${c.swing}-bar swings)</span> — <b style="color:var(--accent)">${c.shape || 'single line'}</b><br>
+      <span style="font-size:13px">${[edge(u, 'upper'), edge(l, 'lower')].filter(Boolean).join(' · ')}</span></div>`;
+  }).join('') || '<div class="status">No channel with respected touches near price right now.</div>';
+  const F = S.fib;
+  let fib = '<div class="status">No clean swing (≥ 3 ATR) to measure right now — price is extending or the last swing was fully retraced.</div>';
+  if (F) {
+    const lv = r => (F.levels.find(x => Math.abs(x.r - r) < 1e-6) || {}).price;
+    const ext = F.levels.filter(x => x.ext).map(x => `${(x.ext * 100).toFixed(1)}% <b>${fmt(x.price)}</b>`).join(' · ');
+    fib = `<div style="font-size:13px">Last ${F.dir} swing ${fmt(F.dir === 'up' ? F.low : F.high)} → <b>${fmt(F.dir === 'up' ? F.high : F.low)}</b>${F.provisional ? ' <span class="status">(still forming)</span>' : ''}<br>
+      price is <b>${(F.depth * 100).toFixed(0)}%</b> retraced ${F.in_golden ? '<b style="color:#b45309">— inside the golden zone</b>' : ''}<br>
+      38.2% <b>${fmt(lv(0.382))}</b> · <span style="color:#b45309">golden zone 50–61.8% <b>${fmt(lv(0.5))}–${fmt(lv(0.618))}</b></span> · 78.6% <b>${fmt(lv(0.786))}</b><br>
+      targets if the swing resumes: ${ext}</div>`;
+  }
+  return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
+    <div class="card"><h3>Channels &amp; wedges</h3><p class="rule">Fitted through swing highs and lows at three sizes. Falling wedges usually break up, rising wedges down; a channel edge is where bounces start. Backtested as <i>wedge breakout</i> and <i>channel bounce</i>.</p>${chs}</div>
+    <div class="card"><h3>Fibonacci retracement</h3><p class="rule">Of the last swing at the intermediate size. The 50–61.8% golden zone is the classic pullback entry; it's backtested as <i>fib golden zone</i>.</p>${fib}</div>
+  </div>`;
+}
+
 function smcCard(rep){
   const S = rep.smc;
   if (!S || S.error) return '';
@@ -654,6 +701,7 @@ function paintVerdict(rep){
   if (v.session) meta.push(`Session: <b>${v.session.name}</b> — ${v.session.note}`);
   if (v.warning) meta.push(`<span class="warn">⚠ ${v.warning}</span>`);
   el.querySelector('.meta').innerHTML = meta.map(m => `<span>${m}</span>`).join('');
+  el.querySelector('.conf').innerHTML = confHtml(rep.confirm);
   paintLiveTrigger();
 }
 // while the candle is still forming: is price already past a trigger? (it only counts on the close)
@@ -786,6 +834,7 @@ function render(rep){
   $('#main').innerHTML = `
     ${scoreboardCard(rep)}
     ${smcCard(rep)}
+    ${structCard(rep)}
     <div class="head">
       <b>${rep.name}</b>
       <span>${fmt(rep.last_close)} <span style="color:var(--mute)">last ${rep.tf_label.toLowerCase()} close ${rep.as_of}</span></span>
@@ -869,7 +918,7 @@ function drawChart(rep){
   // trendlines: two points, extended past the last candle on intraday charts
   const bars = rep.chart.bars, lastBar = bars[bars.length-1], firstT = bars[0].time;
   const stepT = rep.bar_step;
-  for (const l of (rep.trendlines?.lines || [])) {
+  for (const l of ($('#chTog').checked ? [] : (rep.trendlines?.lines || []))) {
     const t0 = l.from.t, lastIdx = bars.length - 1, nFromEnd = l.to.i - (rep.history.bars - 1);   // bars past the end
     const t1 = (rep.intraday && stepT) ? lastBar.time + stepT * nFromEnd : lastBar.time;
     const p1 = (rep.intraday && stepT) ? l.to.price : l.now;
@@ -886,6 +935,39 @@ function drawChart(rep){
     sr.setData(f.pivots.map(p => ({time:p.t, value:p.price})));
     cs.extras.push(sr);
     if (f.level != null) cs.priceLines.push(candles.createPriceLine({price:f.level, color:'#7c3aed', lineWidth:1, lineStyle:3, axisLabelVisible:true, title:'pattern break'}));
+  }
+
+  // channels / wedges as bands; Fibonacci levels from the swing's start
+  const off = rep.history.bars - bars.length;                       // index of the first bar on the chart
+  const timeAt = i => i <= rep.history.bars - 1 ? bars[Math.max(0, i - off)].time
+                      : ((rep.intraday && stepT) ? lastBar.time + stepT * (i - (rep.history.bars - 1)) : lastBar.time);
+  const seg = (pts, color, width, style, title) => {
+    const sr = chart.addLineSeries({color, lineWidth: width, lineStyle: style, lastValueVisible: false, priceLineVisible: false,
+                                    crosshairMarkerVisible: false, title: title || ''});
+    sr.setData(pts); cs.extras.push(sr);
+  };
+  if ($('#chTog').checked) {
+    const STY = {minor: ['rgba(100,116,139,.22)', 4, '#64748b'], intermediate: ['rgba(37,99,235,.20)', 8, '#2563eb'], major: ['rgba(30,58,138,.18)', 12, '#1e3a8a']};
+    for (const c of (rep.structures?.channels || [])) {
+      const [band, w, line] = STY[c.scale] || STY.minor;
+      for (const e of c.edges) {
+        const i0 = Math.max(e.from.i, off), i1 = rep.intraday ? e.to.i : rep.history.bars - 1;
+        const at = i => e.from.price + (e.to.price - e.from.price) * (i - e.from.i) / ((e.to.i - e.from.i) || 1);
+        const pts = [{time: timeAt(i0), value: at(i0)}, {time: timeAt(i1), value: at(i1)}];
+        if (pts[0].time >= pts[1].time) continue;
+        seg(pts, band, w, 0);
+        seg(pts, line, 1, e.broken ? 2 : 0, e.side === 'upper' && c.scale !== 'minor' && c.shape ? `${c.scale} ${c.shape}` : '');
+      }
+    }
+  }
+  const F = rep.structures?.fib;
+  if ($('#fibTog').checked && F) {
+    const t0 = timeAt(Math.max(F.from_i, off)), t1 = timeAt(rep.intraday ? rep.history.bars - 1 + 3 : rep.history.bars - 1);
+    if (t0 < t1) for (const L of F.levels) {
+      const gold = L.r === 0.5 || L.r === 0.618;
+      const name = L.ext ? `target ${(L.ext * 100).toFixed(0)}%` : gold ? `fib ${(L.r * 100).toFixed(1)}%` : '';
+      seg([{time: t0, value: L.price}, {time: t1, value: L.price}], gold ? '#d97706' : L.ext ? '#0f9d58' : '#9ca3af', gold ? 2 : 1, gold || L.r === 0 || L.r === 1 ? 0 : 1, name);
+    }
   }
 
   const markers = [];
