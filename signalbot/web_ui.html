@@ -628,7 +628,7 @@ function structCard(rep){
   if (F) {
     const lv = r => (F.levels.find(x => Math.abs(x.r - r) < 1e-6) || {}).price;
     const ext = F.levels.filter(x => x.ext).map(x => `${(x.ext * 100).toFixed(1)}% <b>${fmt(x.price)}</b>`).join(' · ');
-    fib = `<div style="font-size:13px">Last ${F.dir} swing ${fmt(F.dir === 'up' ? F.low : F.high)} → <b>${fmt(F.dir === 'up' ? F.high : F.low)}</b>${F.provisional ? ' <span class="status">(still forming)</span>' : ''}<br>
+    fib = `<div style="font-size:13px">Last ${F.dir} swing ${fmt(F.dir === 'up' ? F.low : F.high)} → <b>${fmt(F.dir === 'up' ? F.high : F.low)}</b>${F.auto ? ` <span class="status">(${F.auto})</span>` : F.provisional ? ' <span class="status">(still forming)</span>' : ''}<br>
       price is <b>${(F.depth * 100).toFixed(0)}%</b> retraced ${F.in_golden ? '<b style="color:#b45309">— inside the golden zone</b>' : ''}<br>
       38.2% <b>${fmt(lv(0.382))}</b> · <span style="color:#b45309">golden zone 50–61.8% <b>${fmt(lv(0.5))}–${fmt(lv(0.618))}</b></span> · 78.6% <b>${fmt(lv(0.786))}</b><br>
       targets if the swing resumes: ${ext}</div>`;
@@ -699,6 +699,14 @@ function paintVerdict(rep){
   meta.push(`Trend (200 EMA): ${['1d','1h','15m','5m'].map(k => `${k.toUpperCase()} ${arrow(tr[k])}`).join(' · ')} ${v.aligned ? '<b class="tr-up">all aligned</b>' : '<span>mixed</span>'}`);
   if (v.confluence) meta.push(`Rules agreeing now: <b>${v.confluence.buy.length}</b> BUY · <b>${v.confluence.sell.length}</b> SELL of ${v.confluence.of}`);
   if (v.session) meta.push(`Session: <b>${v.session.name}</b> — ${v.session.note}`);
+  const F = rep.structures && rep.structures.fib;
+  if (F) {
+    const lv = r => (F.levels.find(x => Math.abs(x.r - r) < 1e-6) || {}).price;
+    const ext = F.levels.filter(x => x.ext).sort((a, b) => a.ext - b.ext).map(x => fmt(x.price)).join(' / ');
+    meta.push(`<span>Fib (${F.dir} swing ${fmt(F.dir === 'up' ? F.low : F.high)} → ${fmt(F.dir === 'up' ? F.high : F.low)}): `
+      + `price <b>${(F.depth * 100).toFixed(0)}%</b> retraced${F.in_golden ? ' <b style="color:#b45309">— in the golden zone</b>' : ''} · `
+      + `38.2% <b>${fmt(lv(0.382))}</b> · <b style="color:#b45309">golden zone ${fmt(lv(0.5))}–${fmt(lv(0.618))}</b> · 78.6% <b>${fmt(lv(0.786))}</b> · targets ${ext}</span>`);
+  } else meta.push('<span>Fib: no swing big enough to measure on this timeframe</span>');
   if (v.warning) meta.push(`<span class="warn">⚠ ${v.warning}</span>`);
   el.querySelector('.meta').innerHTML = meta.map(m => `<span>${m}</span>`).join('');
   el.querySelector('.conf').innerHTML = confHtml(rep.confirm);

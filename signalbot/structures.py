@@ -157,7 +157,7 @@ def fib_now(d: pd.DataFrame, k: int = 8) -> dict | None:
     a = float(d["atr"].iloc[-1])
     pv = [p for p in pivots(d, k, k) if p.confirmed <= n - 1]
     if len(pv) < 2 or not np.isfinite(a):
-        return None
+        return range_fib(d)
     c = float(d["close"].iloc[-1])
     # the move running since the last confirmed pivot, once it has pulled back for a couple of candles
     last = pv[-1]
@@ -180,13 +180,34 @@ def fib_now(d: pd.DataFrame, k: int = 8) -> dict | None:
             continue
         after = d.iloc[p1.i + 1:]
         if len(after) and ((after["high"].max() > hi) if up else (after["low"].min() < lo)):
-            return None                               # the swing has extended: no retracement to measure yet
+            break                                     # the swing has extended
         if len(after) and ((after["close"].min() < lo) if up else (after["close"].max() > hi)):
-            return None                               # fully retraced: the swing is void
+            break                                     # fully retraced: the swing is void
         depth = (hi - c) / (hi - lo) if up else (c - lo) / (hi - lo)
         return {"dir": "up" if up else "down", "from_i": p0.i, "to_i": p1.i, "low": lo, "high": hi,
                 "depth": depth, "in_golden": 0.5 <= depth <= 0.786, "levels": fib_levels(lo, hi, up)}
-    return None
+    return range_fib(d)
+
+
+def range_fib(d: pd.DataFrame, lookback: int = 120) -> dict | None:
+    """Fallback, like an auto-fib tool: the highest high and lowest low of the recent candles; the swing
+    runs from whichever came first to whichever came last."""
+    n = len(d)
+    w = d.iloc[-min(lookback, n):]
+    a = float(d["atr"].iloc[-1])
+    if len(w) < 10 or not np.isfinite(a):
+        return None
+    hi_j, lo_j = int(np.argmax(w["high"].to_numpy())), int(np.argmin(w["low"].to_numpy()))
+    hi, lo = float(w["high"].iloc[hi_j]), float(w["low"].iloc[lo_j])
+    if hi - lo < 1.5 * a or hi_j == lo_j:
+        return None
+    up = lo_j < hi_j
+    base = n - len(w)
+    c = float(d["close"].iloc[-1])
+    depth = (hi - c) / (hi - lo) if up else (c - lo) / (hi - lo)
+    return {"dir": "up" if up else "down", "from_i": base + (lo_j if up else hi_j), "to_i": base + (hi_j if up else lo_j),
+            "low": lo, "high": hi, "depth": depth, "in_golden": 0.5 <= depth <= 0.786,
+            "levels": fib_levels(lo, hi, up), "provisional": True, "auto": f"range of the last {len(w)} candles"}
 
 
 def rolling(d: pd.DataFrame, k: int = 8, keep: int = 8, dist: float = 6.0) -> dict:
