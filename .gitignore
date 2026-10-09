@@ -1,0 +1,18 @@
+# secrets — never commit
+.env
+.streamlit/secrets.toml
+
+# local runtime data (re-downloaded automatically)
+data/
+state/
+.component/
+
+# local only
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+_backup_with_indices_*/
+dist/
+zero_byte_products.txt
+.DS_Store

@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>signalbot</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#141821;--mute:#6b7280;--line:#e5e7eb;
+        --buy:#0f9d58;--sell:#d93025;--none:#9ca3af;--warn:#b45309;--warnbg:#fff7ed;--accent:#2563eb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--mute);margin:0 0 18px}
+  .bar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-bottom:18px}
+  .bar input[type=number]{border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit}
+  .tab{border:1px solid var(--line);background:var(--card);padding:8px 14px;border-radius:999px;cursor:pointer;font-weight:600}
+  .tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .tab.tf{padding:7px 12px;font-weight:500;border-radius:8px}
+  .tab.tf.on{background:var(--accent);border-color:var(--accent)}
+  .tog{display:flex;gap:6px;align-items:center;color:var(--mute);font-size:14px}
+  .src-live{color:var(--buy);font-weight:700}.src-btn{border:1px solid var(--accent);color:var(--accent);background:#fff;padding:5px 10px;border-radius:8px;text-decoration:none;font-weight:600}
+  button.ghost{border:1px solid var(--line);background:var(--card);padding:7px 12px;border-radius:8px;cursor:pointer}
+  .head{display:flex;flex-wrap:wrap;gap:18px;align-items:baseline;margin:6px 0 16px}
+  .head b{font-size:28px}
+  .pill{padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}
+  .pill.up{background:#dcfce7;color:#166534}.pill.down{background:#fee2e2;color:#991b1b}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-bottom:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .card h3{margin:0 0 2px;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)}
+  .rule{color:var(--mute);font-size:13px;margin:0 0 12px}
+  .side{display:inline-block;font-size:26px;font-weight:800;letter-spacing:.5px;margin:4px 0 2px}
+  .side.BUY{color:var(--buy)}.side.SELL{color:var(--sell)}.side.NONE{color:var(--none);font-size:20px}
+  .status{font-size:13px;color:var(--mute);margin-left:8px}
+  .levels{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0}
+  .lv{background:var(--bg);border-radius:10px;padding:10px 12px}
+  .lv small{display:block;color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .lv b{font-size:18px}
+  .lv.tgt b{color:var(--buy)}.lv.stp b{color:var(--sell)}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 12px;font-size:13px;margin-top:10px}
+  .stats div span{display:block;color:var(--mute);font-size:11px}
+  .stats div b{font-size:15px}
+  .note{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:9px 12px;font-size:13px;margin-top:10px}
+  .watch{font-size:13px;color:var(--mute);margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+  .watch b{color:var(--ink)}
+  .eq{width:100%;height:70px;margin-top:10px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  th{text-align:left;color:var(--mute);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:6px 6px;border-bottom:1px solid var(--line)}
+  td{padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td.pos{color:var(--buy)}td.neg{color:var(--sell)}
+  .chartcard{padding:12px 14px 14px;margin-bottom:16px;position:relative}
+  #chartLoading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;
+    background:rgba(255,255,255,.82);z-index:20;border-radius:14px;padding:20px;font-size:15px}
+  .chartbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-bottom:8px}
+  .chartbar h3{margin:0}
+  #chartTfs .tab.tf{padding:4px 10px;font-size:13px}
+  .px{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;transition:color .25s}
+  .px.up{color:var(--buy)}.px.down{color:var(--sell)}
+  .tickstate{font-size:12px;color:var(--mute)}
+  .verdict{border-radius:10px;padding:10px 14px;margin:2px 0 10px;border:1px solid var(--line);background:#f3f4f6}
+  .verdict b.h{font-size:16px;letter-spacing:.3px}
+  .verdict .d{font-size:13px;margin-top:3px;color:#374151}
+  .verdict.wait,.verdict.running{background:#f3f4f6;border-color:#d1d5db}
+  .verdict.wait b.h,.verdict.running b.h{color:#4b5563}
+  .verdict.BUY{background:#dcfce7;border-color:#86efac}.verdict.BUY b.h{color:#166534}
+  .verdict.SELL{background:#fee2e2;border-color:#fca5a5}.verdict.SELL b.h{color:#991b1b}
+  .verdict.news{background:#fff7ed;border-color:#fdba74}.verdict.news b.h{color:#b45309}
+  .verdict .now{margin-top:5px;font-size:13px;font-weight:700}
+  .verdict .meta{margin-top:6px;font-size:12.5px;color:#4b5563;display:flex;flex-wrap:wrap;gap:4px 16px}
+  .verdict .meta .warn{color:var(--sell);font-weight:700}
+  .tr-up{color:var(--buy);font-weight:700}.tr-down{color:var(--sell);font-weight:700}
+  table.sb td,table.sb th{padding:6px 8px}
+  table.sb tr.row{cursor:pointer}
+  table.sb tr.row:hover td{background:#f9fafb}
+  table.sb td.good{color:var(--buy);font-weight:700}table.sb td.bad{color:var(--sell)}
+  table.sb tr.thin td{color:var(--mute)}
+  .badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700}
+  .badge.BUY{background:#dcfce7;color:#166534}.badge.SELL{background:#fee2e2;color:#991b1b}.badge.none{background:#f3f4f6;color:#6b7280}
+  .fsbtn{margin-left:auto}
+  #chart{height:480px;width:100%}
+  .chartcard:fullscreen{background:#fff;border-radius:0;border:0;display:flex;flex-direction:column;padding:12px 16px}
+  .chartcard:-webkit-full-screen{background:#fff;border-radius:0;border:0;display:flex;flex-direction:column;padding:12px 16px}
+  .chartcard:fullscreen #chart{flex:1;height:auto !important;min-height:0}
+  .chartcard:-webkit-full-screen #chart{flex:1;height:auto !important;min-height:0}
+  details summary{cursor:pointer;color:var(--mute);font-size:13px;margin-top:8px}
+  .foot{color:var(--mute);font-size:12px;margin-top:22px;line-height:1.6}
+  .err{background:#fee2e2;color:#991b1b;padding:12px 14px;border-radius:10px}
+  .news{border-radius:14px;padding:14px 18px;margin-bottom:14px;border:1px solid var(--line);background:var(--card)}
+  .news.hot{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
+  .news b.t{font-size:15px}
+  .news table{margin-top:8px}
+  .imp{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .imp.High{background:#d93025}.imp.Medium{background:#f59e0b}.imp.Low{background:#9ca3af}
+  .note.red{background:#fee2e2;color:#991b1b;font-weight:600}
+  .skel{color:var(--mute);padding:40px;text-align:center}
+  .tab .x{margin-left:8px;opacity:.55;font-weight:700}.tab .x:hover{opacity:1;color:var(--sell)}
+  .tab.add{border-style:dashed;color:var(--accent);font-weight:600}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;margin:3px 4px 3px 0;cursor:pointer;font:inherit;font-size:13px}
+  .chip.on{background:#eff6ff;border-color:#93c5fd}
+  .chip.res{display:block;width:100%;text-align:left;border-radius:10px;margin:4px 0}
+  .chip.res small{color:var(--mute);margin-left:6px}
+  .pg{margin:4px 0}.pgl{display:inline-block;width:130px;color:var(--mute);font-size:12px}
+  @media (max-width: 760px){ .pgl{display:block;width:auto;margin-top:4px} }
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  @media (max-width: 760px){
+    body{font-size:14px}
+    .wrap{padding:12px 10px 40px}
+    h1{font-size:18px}.sub{display:none}
+    .bar{gap:6px 8px;margin-bottom:10px}
+    .tab{padding:6px 10px;font-size:13px}.tab.tf{padding:5px 9px}
+    #tfs{display:none}                         /* the timeframe buttons on the chart do the job */
+    .chartcard{padding:8px 8px 10px}
+    .chartbar{gap:6px 10px}.chartbar h3{font-size:11px}
+    .px{font-size:19px}
+    .fsbtn{margin-left:0;padding:5px 9px}
+    #chart{height:56vh;min-height:300px}
+    .verdict{padding:8px 10px}.verdict b.h{font-size:14px}.verdict .d,.verdict .now{font-size:12.5px}
+    .verdict .meta{font-size:11.5px;gap:3px 10px}
+    .grid{grid-template-columns:1fr !important;gap:10px}
+    .card{padding:14px}
+    .head{gap:8px 12px}.head b{font-size:20px}
+    .levels{gap:6px}.lv{padding:8px}.lv b{font-size:15px}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .card table, .news table{display:block;overflow-x:auto;white-space:nowrap}
+    #live{font-size:11px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>signalbot</h1>
+  <p class="sub">What the rules say right now for gold and any market you add, on daily, hourly, 15-minute and 5-minute candles — how those exact rules have done across every bar on record — and when the news calendar says to stay out.</p>
+
+  <div class="bar">
+    <div id="tabs"></div>
+    <div id="tfs" style="margin-left:6px"></div>
+    <label class="tog" id="flatWrap" style="margin-left:0;display:none"><input type="checkbox" id="flat"> flat by close</label>
+    <label class="tog" style="margin-left:0"><input type="checkbox" id="longOnly"> long-only</label>
+    <span class="tog" style="margin-left:0">stop <input id="stopAtr" type="number" step="0.5" min="0.5" style="width:52px"> × ATR</span>
+    <span class="tog" style="margin-left:0">target <input id="tgtAtr" type="number" step="0.5" min="0.5" style="width:52px"> × ATR</span>
+    <span class="tog" style="margin-left:0">time stop <input id="maxBars" type="number" step="1" min="1" style="width:52px"> bars</span>
+    <span class="tog" style="margin-left:0" title="round-trip spread + commission taken off every backtested trade">spread $ <input id="cost" type="number" step="0.05" min="0" style="width:60px"></span>
+    <button class="ghost" id="refresh">Refresh</button>
+    <span id="auto" style="color:var(--mute);font-size:12px"></span>
+    <span id="src" style="margin-left:auto;font-size:13px;color:var(--mute)"></span>
+  </div>
+  <div id="addPanel" class="card" style="display:none;margin:-6px 0 14px">
+    <h3>Add a market</h3>
+    <p class="rule">One click for the popular ones (no API credits), or search anything Twelve Data's free plan streams: forex, metals, crypto, US stocks and ETFs. Indian NSE/BSE stocks need a paid Twelve Data plan.</p>
+    <div id="popular"></div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><input id="q" placeholder="search: e.g. XAG, GBP/JPY, ETH, MSFT" style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit">
+      <button class="ghost" id="qBtn">Search</button></div>
+    <div id="results" style="margin-top:10px"></div>
+  </div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin:-8px 0 14px;font-size:12px;color:var(--mute)"><span id="ltp" style="font-weight:700;color:var(--ink)"></span><span id="live"></span></div>
+
+  <div class="card chartcard" id="chartCard">
+    <div class="chartbar">
+      <h3 id="chartTitle">signalbot</h3>
+      <div id="chartTfs"></div>
+      <span id="px" class="px">—</span>
+      <span id="tickState" class="tickstate">connecting to the live feed…</span>
+      <span id="volNow" class="tickstate"></span>
+      <button class="ghost fsbtn" id="fsBtn" title="Full screen (F) — Esc to exit">⛶ Full screen</button>
+    </div>
+    <div id="verdict" class="verdict wait"><b class="h">…</b><div class="d"></div><div class="now"></div><div class="meta"></div></div>
+    <div id="chart"></div>
+    <div class="tickstate" style="margin-top:6px">Session strip (top of chart): <b style="color:#7c3aed">Asia</b> 05:30–12:30 IST · <b style="color:#2563eb">London</b> 12:30–17:30 · <b style="color:#0f9d58">London + NY</b> 17:30–21:30 (most liquid) · <b style="color:#ea580c">New York</b> 21:30–02:30 · <b style="color:#6b7280">after hours</b> 02:30–05:30.<br>Volume pane: <b style="color:#0f9d58">bars</b> = COMEX gold futures contracts per candle (solid = ≥1.5× the 20-candle average, faded = normal; ~10 min delayed) · <b style="color:#2563eb">blue line</b> = live tick volume (price updates per candle, counts up as ticks arrive)</div>
+  </div>
+
+  <div id="main"><div class="skel">Loading history…</div></div>
+
+  <p class="foot">
+    Every number here is the rule's own record, replayed bar by bar with conservative fills (entry at the next open; when a bar touches both stop and target the stop is assumed first; gaps fill at the open).
+    A BUY or SELL is the rule firing, not a forecast — the win rate beside it is how often this same situation worked out before, and it will not hold for any individual trade.
+    Spread and commission are not modelled. Not financial advice.
+  </p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+// ── embedded in Streamlit (streamlit_app.py)? Then data comes from Python via the component protocol,
+//    and live ticks come straight from Twelve Data's WebSocket in this browser. ──
+const ST = new URLSearchParams(location.search).has('streamlitUrl');
+let stArgs = null, stPending = null, stBooted = false, stMeta = null, stSearchPending = null;
+function stSend(type, extra){ window.parent.postMessage(Object.assign({isStreamlitMessage: true, type}, extra || {}), '*'); }
+function stRequest(value){ stSend('streamlit:setComponentValue', {value: Object.assign({nonce: Date.now()}, value), dataType: 'json'}); }
+function stFit(){ if (ST) stSend('streamlit:setFrameHeight', {height: Math.ceil(document.documentElement.scrollHeight) + 4}); }
+function onStRender(args){
+  stArgs = args;
+  if (!stBooted) { stBooted = true; if (args.report) { state.tf = args.report.tf; state.symbol = args.report.symbol; } init(); return; }
+  if (args.meta) { stMeta = args.meta; renderTabs(); }
+  if (args.search && stSearchPending && args.search.nonce === stSearchPending.nonce) { const f = stSearchPending.res; stSearchPending = null; f(args.search.results || []); }
+  if (stPending) { const f = stPending; stPending = null; f(args.report); return; }
+  if (args.report && curRep && (args.report.as_of !== curRep.as_of || args.report.tf !== curRep.tf
+      || JSON.stringify(args.report.params) !== JSON.stringify(curRep.params) || args.report.long_only !== curRep.long_only)) {
+    state.tf = args.report.tf; state.symbol = args.report.symbol; renderTabs(); load();
+  }
+}
+if (ST) {
+  window.addEventListener('message', e => { if (e.data && e.data.type === 'streamlit:render') onStRender(e.data.args); });
+  stSend('streamlit:componentReady', {apiVersion: 1});
+  new ResizeObserver(() => stFit()).observe(document.body);
+}
+const decs = v => { const a = Math.abs(Number(v)); return a < 2 ? 5 : a < 20 ? 4 : a < 200 ? 3 : 2; };
+const fmt = v => v == null ? '—' : Number(v).toLocaleString('en-US', {minimumFractionDigits: decs(v), maximumFractionDigits: decs(v)});
+const fmtPx = fmt;
+const pct = v => (v*100).toFixed(0) + '%';
+const r2 = v => (v>=0?'+':'') + v.toFixed(2) + 'R';
+let state = {symbol: localStorage.getItem('sb.symbol') || 'XAUUSD', tf: localStorage.getItem('sb.tf') || '1d',
+             longOnly: localStorage.getItem('sb.long') === '1', flat: localStorage.getItem('sb.flat') ?? ''};
+let chart, candles, timer, tick, cs = {};   // cs = chart state (series kept between refreshes)
+
+async function init(){
+  const meta = ST ? stArgs.meta : await (await fetch('/api/symbols')).json();
+  if (ST) {   // the rule settings live in Streamlit (Python) in this mode
+    // inside Streamlit the frame grows to fit the page, so viewport units would feed back into
+    // themselves: size the chart from the device screen instead
+    const small = Math.min(screen.width, innerWidth) < 760;
+    $('#chart').style.height = (small ? Math.max(300, Math.min(520, Math.round(screen.height * 0.5))) : 520) + 'px';
+    for (const id of ['#longOnly', '#stopAtr', '#tgtAtr', '#maxBars', '#cost', '#refresh'])
+      { const el = $(id).closest('label, span, button') || $(id); el.style.display = 'none'; }
+    $('#auto').style.display = 'none';
+  }
+  symMeta = meta;
+  if (!meta.symbols.some(x => x.symbol === state.symbol)) state.symbol = meta.symbols[0].symbol;
+  renderTabs();
+  $('#tfs').innerHTML = meta.timeframes.map(t => `<button class="tab tf ${t.tf===state.tf?'on':''}" data-tf="${t.tf}">${t.label}</button>`).join(' ');
+  $('#tabs').onclick = e => {
+    const x = e.target.closest('.x');
+    if (x) { e.stopPropagation(); removeMarket(x.dataset.s); return; }
+    if (e.target.closest('#addBtn')) { toggleAdd(); return; }
+    const b = e.target.closest('.tab[data-s]'); if (!b) return;
+    pickSymbol(b.dataset.s);
+  };
+  $('#chartTfs').innerHTML = meta.timeframes.map(t => `<button class="tab tf ${t.tf===state.tf?'on':''}" data-tf="${t.tf}">${{'1d':'1D','1h':'1H','15m':'15m','5m':'5m'}[t.tf] || t.label}</button>`).join(' ');
+  const pickTf = e => { const b = e.target.closest('.tab'); if(!b) return; state.tf = b.dataset.tf; localStorage.setItem('sb.tf', state.tf);
+    document.querySelectorAll('#tfs .tab, #chartTfs .tab').forEach(t => t.classList.toggle('on', t.dataset.tf===state.tf)); load(); };
+  $('#tfs').onclick = pickTf;
+  $('#chartTfs').onclick = pickTf;
+  $('#longOnly').checked = state.longOnly;
+  $('#longOnly').onchange = e => { state.longOnly = e.target.checked; localStorage.setItem('sb.long', state.longOnly?'1':'0'); load(); };
+  $('#flat').onchange = e => { state.flat = e.target.checked ? '1' : '0'; localStorage.setItem('sb.flat', state.flat); load(); };
+  for (const id of ['stopAtr','tgtAtr','maxBars','cost']) {
+    $('#'+id).value = localStorage.getItem('sb.'+id) || '';
+    $('#'+id).onchange = e => { localStorage.setItem('sb.'+id, e.target.value); load(); };
+  }
+  $('#refresh').onclick = () => load(true);
+  $('#fsBtn').onclick = toggleFullscreen;
+  $('#qBtn').onclick = searchMarkets;
+  $('#q').addEventListener('keydown', e => { if (e.key === 'Enter') searchMarkets(); });
+  $('#addPanel').addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    const sym = (symMeta || stMeta || stArgs.meta).symbols.find(s => s.td === c.dataset.td);
+    if (sym) { pickSymbol(sym.symbol); return; }               // already on the list: just open it
+    addMarket({td: c.dataset.td, name: c.dataset.name, type: c.dataset.type, exchange: c.dataset.ex || ''});
+  });
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  document.addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) toggleFullscreen(); });
+  openStream();
+  load();
+}
+
+
+let loadSeq = 0;
+function showLoading(on, text){
+  let o = $('#chartLoading');
+  if (!o) { o = document.createElement('div'); o.id = 'chartLoading'; $('#chartCard').appendChild(o); }
+  o.style.display = on ? 'flex' : 'none';
+  if (text) o.innerHTML = `<div><b>${text}</b><br><span class="tickstate">first time for a market: downloading its history — usually a few seconds, up to a minute on the free plan</span></div>`;
+}
+async function load(force=false){
+  const seq = ++loadSeq;
+  const switching = !curRep || curRep.symbol !== state.symbol || curRep.tf !== state.tf;
+  if (switching) {
+    const nm = ((ST ? (stMeta || stArgs.meta) : symMeta)?.symbols || []).find(s => s.symbol === state.symbol);
+    showLoading(true, `Loading ${nm ? nm.short : state.symbol} · ${state.tf}…`);
+  }
+  if (!$('#main .head')) $('#main').innerHTML = '<div class="skel">Downloading history and replaying the rules… (first run takes a few seconds)</div>';
+  const intraday = state.tf !== '1d';
+  const flat = intraday ? state.flat : '';
+  const tune = `&stop_atr=${$('#stopAtr').value}&target_atr=${$('#tgtAtr').value}&max_bars=${$('#maxBars').value}&cost=${$('#cost').value}`;
+  let rep;
+  if (ST) {
+    if (!force && stArgs && stArgs.report && stArgs.report.tf === state.tf && stArgs.report.symbol === state.symbol) rep = stArgs.report;
+    else rep = await new Promise(res => { stPending = res; stRequest({tf: state.tf, symbol: state.symbol, refresh: !!force}); });
+    if (!rep) { $('#main').innerHTML = '<div class="err">No data yet — check the Twelve Data key in the app secrets.</div>'; return; }
+  } else {
+    const r = await fetch(`/api/report?symbol=${state.symbol}&tf=${state.tf}&long_only=${state.longOnly?1:0}&flat=${flat}&refresh=${force?1:0}${tune}`);
+    rep = await r.json();
+  }
+  if (seq !== loadSeq) return;                 // the user picked another market/timeframe meanwhile
+  showLoading(false);
+  if (rep.error) { showLoading(true, `Couldn't load ${state.symbol}: ${rep.error}`); $('#main').innerHTML = `<div class="err">${rep.error}</div>`; return; }
+  $('#flat').checked = rep.flat_by_close;
+  $('#src').innerHTML = `data: <span class="src-live">● Twelve Data</span> (${rep.name})` + (rep.credits ? ` · credits today ${rep.credits.used}/${rep.credits.limit}` : '');
+  $('#stopAtr').placeholder = rep.params.stop_atr; $('#tgtAtr').placeholder = rep.params.target_atr; $('#maxBars').placeholder = rep.params.max_bars; $('#cost').placeholder = rep.params.cost;
+  render(rep);
+  // the rules re-run the moment a candle closes (driven by the live ticks, see onTick);
+  // this timer is only a safety net for when the stream is silent
+  clearTimeout(timer); clearInterval(tick);
+  const every = {'5m': 60, '15m': 120, '1h': 300, '1d': 900}[state.tf];
+  const safety = () => { timer = setTimeout(() => { if (Date.now() - lastTickAt > 30000) load(true); else safety(); }, every * 1000); };
+  safety();
+  $('#auto').textContent = 'rules re-run the moment each candle closes';
+  const updated = new Date(), lastBar = rep.chart.bars[rep.chart.bars.length-1];
+  const lastT = rep.intraday ? new Date(lastBar.time*1000).toISOString().slice(11,16) : lastBar.time;
+  const paint = () => {
+    const now = Date.now(), left = Math.max(0, Math.round((closesAt(bucketOf(now, rep.tf), rep.tf) - now) / 1000));
+    const mmss = left >= 3600 ? `${Math.floor(left/3600)}h ${String(Math.floor(left%3600/60)).padStart(2,'0')}m` : `${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}`;
+    $('#live').textContent = `rules evaluated on candles closed up to ${lastT} IST · this ${rep.tf_label.toLowerCase()} candle closes in ${mmss} — the rules re-run the moment it does · updated ${updated.toLocaleTimeString('en-IN',{hour12:false})} · the forming candle moves with every tick but is never traded until it closes`;
+    paintState();
+    paintLiveTrigger();
+  };
+  paint(); tick = setInterval(paint, 1000);
+  startLive(rep);
+}
+
+// ── live: every tick is pushed by the local server (Server-Sent Events) the moment
+//    Twelve Data sends it; the forming candle and the price update on each one ─────
+const STEP = {'5m': 300, '15m': 900, '1h': 3600};
+let es = null, fc = null, curRep = null, liveTimer = null, reloadPending = false;
+let lastTickAt = 0, lastPx = null, streamState = 'connecting', streamMsg = '';
+function bucketOf(ms, tf){
+  if (tf === '1d') return new Date(ms).toISOString().slice(0, 10);
+  const st = STEP[tf]; return Math.floor(ms / 1000 / st) * st + 19800;       // chart time = IST wall clock
+}
+function closesAt(bucket, tf){
+  if (tf === '1d') return Date.parse(bucket + 'T00:00:00Z') + 86400000;
+  return (bucket - 19800 + STEP[tf]) * 1000;
+}
+function lastClosedTime(){ const b = curRep.chart.bars; return b[b.length - 1].time; }
+function candleClosed(){
+  if (reloadPending) return;
+  reloadPending = true;
+  setTimeout(() => { reloadPending = false; load(true); }, ST ? 5000 : 1200);   // give the feed time to publish the closed minute
+}
+function istClock(ms){ return new Date(ms + 19800000).toISOString().slice(11, 19); }
+function paintPrice(p, ms){
+  const el = $('#px');
+  el.textContent = fmtPx(p);
+  if (lastPx != null && p !== lastPx) el.className = 'px ' + (p > lastPx ? 'up' : 'down');
+  lastPx = p;
+  $('#ltp').textContent = `${curRep ? curRep.short : ''} ${fmtPx(p)} @ ${ms ? istClock(ms) : ''} IST`;
+}
+function paintState(){
+  const age = lastTickAt ? (Date.now() - lastTickAt) / 1000 : null;
+  let h;
+  if (streamState === 'live' && age != null && age < 20) h = `<span class="src-live">● LIVE</span> · last tick ${age < 1 ? 'just now' : Math.floor(age) + 's ago'} · Twelve Data stream`;
+  else if (streamState === 'closed') h = 'market closed for the weekend — showing the last prices';
+  else if (streamState === 'off' || streamState === 'error') h = `<span style="color:var(--sell)">stream ${streamState}</span> ${streamMsg ? '· ' + streamMsg : ''} · chart updates from 1-minute bars`;
+  else h = `${streamState}${streamMsg ? ' · ' + streamMsg : ''}${age != null ? ` · last tick ${Math.floor(age)}s ago` : ''}`;
+  $('#tickState').innerHTML = h;
+}
+function onTick(p, ms, sym){
+  if (sym && curRep && sym !== curRep.symbol) return;          // a tick for another market on the watchlist
+  lastTickAt = Date.now();
+  paintPrice(p, ms);
+  paintLiveTrigger();
+  if (!curRep || !candles) return;
+  const b = bucketOf(ms, curRep.tf);
+  if (b <= lastClosedTime()) return;
+  if (!fc || b > fc.time) {
+    if (fc) candleClosed();                                                  // the forming candle just closed
+    fc = {time: b, open: p, high: p, low: p, close: p, ticks: 1};
+  } else if (b === fc.time) {
+    fc.high = Math.max(fc.high, p); fc.low = Math.min(fc.low, p); fc.close = p; fc.ticks = (fc.ticks || 0) + 1;
+  } else return;
+  drawForming();
+}
+// ── trading sessions (UTC): drawn as a colour strip across the top of intraday charts ──
+const SESSIONS = [[0, 7, 'Asia', 'rgba(124,58,237,.55)', 'Asia'], [7, 12, 'London', 'rgba(37,99,235,.65)', 'LDN'],
+                  [12, 16, 'London + NY', 'rgba(15,157,88,.75)', 'LDN+NY'], [16, 21, 'New York', 'rgba(234,88,12,.65)', 'NY'],
+                  [21, 24, 'after hours', 'rgba(156,163,175,.45)', '']];
+function sessionAt(t){                      // t = chart time (IST wall clock written as UTC seconds)
+  const h = Math.floor((((t - 19800) % 86400) + 86400) % 86400 / 3600);
+  return SESSIONS.find(([a, b]) => h >= a && h < b);
+}
+function drawSessions(rep){
+  if (!cs.sesS) return;
+  if (!rep.intraday) { cs.sesS.setData([]); cs.sesS.setMarkers([]); return; }
+  const data = [], marks = [];
+  let prev = null;
+  for (const b of rep.chart.bars) {
+    const s = sessionAt(b.time);
+    data.push({time: b.time, value: 1, color: s[3]});
+    if (s[2] !== prev && s[4]) marks.push({time: b.time, position: 'belowBar', shape: 'square', size: 0, color: s[3].replace(/,[.\d]+\)$/, ',1)'), text: s[4]});
+    prev = s[2];
+  }
+  cs.sesS.setData(data);
+  cs.sesS.setMarkers(marks);
+  cs.sesLast = prev;
+}
+
+function drawForming(){
+  candles.update({time: fc.time, open: fc.open, high: fc.high, low: fc.low, close: fc.close});
+  if (cs.tickS && fc.ticks) cs.tickS.update({time: fc.time, value: fc.ticks});
+  if (cs.sesS && curRep && curRep.intraday) cs.sesS.update({time: fc.time, value: 1, color: sessionAt(fc.time)[3]});
+  paintVolume();
+}
+function paintVolume(){
+  const v = curRep && curRep.volume || {};
+  const parts = [];
+  if (fc && fc.ticks) parts.push(`this candle: <b>${fc.ticks}</b> ticks${cs.tickAvg ? ` (${(fc.ticks / cs.tickAvg).toFixed(1)}× avg so far)` : ''}`);
+  if (v.comex_until) {
+    const last = (curRep.chart.vol || []).slice(-1)[0];
+    if (last) parts.push(`${v.label || 'volume'} last print ${v.comex_until.slice(11) || v.comex_until}: <b>${Math.round(last.value).toLocaleString('en-US')}</b>`);
+  } else if (curRep && curRep.kind !== 'fx') parts.push(`${v.label || 'volume'} unavailable`);
+  $('#volNow').innerHTML = parts.length ? '· volume ' + parts.join(' · ') : '';
+}
+let tdWs = null, tdHb = null, tdSym = null;
+function tdFollow(){            // switch the browser stream to the market on screen
+  if (!ST || !tdWs || tdWs.readyState !== 1 || !curRep || curRep.td === tdSym) return;
+  try {
+    if (tdSym) tdWs.send(JSON.stringify({action: 'unsubscribe', params: {symbols: tdSym}}));
+    tdSym = curRep.td;
+    tdWs.send(JSON.stringify({action: 'subscribe', params: {symbols: tdSym}}));
+    lastPx = null;
+  } catch (e) {}
+}
+function openTD(){
+  try { tdWs && tdWs.close(); } catch (e) {}
+  streamState = 'connecting'; paintState();
+  tdWs = new WebSocket('wss://ws.twelvedata.com/v1/quotes/price?apikey=' + encodeURIComponent(stArgs.td_key || ''));
+  tdWs.onopen = () => {
+    tdSym = (curRep && curRep.td) || (stArgs.report && stArgs.report.td) || 'XAU/USD';
+    tdWs.send(JSON.stringify({action: 'subscribe', params: {symbols: tdSym}}));
+    clearInterval(tdHb); tdHb = setInterval(() => { try { tdWs.send('{"action":"heartbeat"}'); } catch (e) {} }, 10000);
+  };
+  tdWs.onmessage = e => {
+    let m; try { m = JSON.parse(e.data); } catch (_) { return; }
+    if (m.event === 'price' && m.price != null) {
+      if (streamState !== 'live') { streamState = 'live'; streamMsg = ''; }
+      if (m.symbol && m.symbol !== tdSym) return;
+      onTick(Number(m.price), Date.now());
+    } else if (m.event === 'subscribe-status') {
+      if (m.status !== 'ok' || (m.fails && m.fails.length)) { streamState = 'error'; streamMsg = 'subscription refused'; }
+      else if (streamState !== 'live') { streamState = 'subscribed'; streamMsg = 'waiting for the first tick'; }
+      paintState();
+    }
+  };
+  tdWs.onclose = () => { clearInterval(tdHb); streamState = 'reconnecting'; streamMsg = ''; paintState(); setTimeout(openTD, 3000); };
+}
+function openStream(){
+  if (ST) return openTD();
+  if (es) es.close();
+  es = new EventSource('/api/stream');
+  es.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'tick') onTick(m.p, m.t, m.s);
+    else if (m.type === 'status') { streamState = m.state; streamMsg = m.message || ''; paintState(); }
+  };
+  es.onerror = () => { streamState = 'reconnecting'; paintState(); };       // EventSource retries by itself
+}
+// the server's view of the forming candle (from 1-minute bars): seeds the open and
+// fills any buckets between the last closed candle and now; ticks do the rest
+function startLive(rep){
+  if (!curRep || curRep.symbol !== rep.symbol) { lastPx = null; $('#px').textContent = '—'; }
+  curRep = rep; fc = null;
+  tdFollow();
+  clearInterval(liveTimer);
+  const poll = async () => {
+    try {
+      const r = ST ? rep.forming : await (await fetch(`/api/live?symbol=${rep.symbol}&tf=${rep.tf}`)).json();
+      if (!r || r.error || !candles || curRep !== rep) return;
+      const lastClosed = lastClosedTime();
+      for (const b of r.bars) if (b.time > lastClosed && (!fc || b.time < fc.time)) {
+        candles.update({time: b.time, open: b.open, high: b.high, low: b.low, close: b.close});
+        if (b.ticks) cs.tickS.update({time: b.time, value: b.ticks});
+      }
+      if (r.open != null) {
+        if (fc && r.time === fc.time) {
+          fc.open = r.open; fc.high = Math.max(fc.high, r.high); fc.low = Math.min(fc.low, r.low);
+          fc.ticks = Math.max(fc.ticks || 0, r.ticks || 0);
+          if (Date.now() - lastTickAt > 10000) fc.close = r.close;
+          drawForming();
+        } else if (!fc || r.time > fc.time) {
+          if (fc) candleClosed();
+          fc = {time: r.time, open: r.open, high: r.high, low: r.low, close: r.close, ticks: r.ticks || 0};
+          drawForming();
+        }
+      }
+      if (Date.now() - lastTickAt > 10000 && r.last_price != null) { lastPx = null; paintPrice(r.last_price, Date.parse(r.last_time.replace(' ', 'T') + ':00Z') - 19800000); }
+    } catch (e) { /* keep the last drawn state */ }
+  };
+  poll();
+  if (!ST) liveTimer = setInterval(poll, 5000);
+}
+
+// ── full screen ───────────────────────────────────────────────────────────────
+function toggleFullscreen(){
+  const card = $('#chartCard');
+  const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+  if (isFs) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  else (card.requestFullscreen || card.webkitRequestFullscreen).call(card);
+}
+function onFsChange(){
+  const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  $('#fsBtn').textContent = isFs ? '✕ Exit full screen' : '⛶ Full screen';
+  const el = $('#chart');
+  if (chart) setTimeout(() => chart.resize(el.clientWidth, el.clientHeight), 50);
+}
+
+function sideStats(st, side){
+  if (!side) return '';
+  const n = side==='BUY' ? st.buys : st.sells, w = side==='BUY' ? st.buy_win_rate : st.sell_win_rate;
+  return `${n} ${side} trades before, ${pct(w)} won`;
+}
+
+function signalCard(title, rule, sig, st, extraNote, equity, trades){
+  const side = sig.side || 'NONE';
+  const label = sig.side ? sig.side : 'NO TRADE';
+  const status = sig.status==='signal' ? 'new — fired on the latest close, enter at the next candle' : sig.note;
+  const w = sig.watch || {};
+  const rr = sig.entry!=null ? Math.abs((sig.target-sig.entry)/(sig.entry-sig.stop)).toFixed(1) : null;
+  let levels = '';
+  if (sig.entry != null) levels = `
+    <div class="levels">
+      <div class="lv"><small>from (entry)</small><b>${fmt(sig.entry)}</b></div>
+      <div class="lv tgt"><small>to (target)</small><b>${fmt(sig.target)}</b></div>
+      <div class="lv stp"><small>stop</small><b>${fmt(sig.stop)}</b></div>
+    </div>
+    <div style="font-size:13px;color:var(--mute)">reward : risk = ${rr} : 1 · ${sideStats(st, sig.side)}</div>`;
+  let watch = '';
+  if (w.trigger != null) watch = `<div class="watch">${sig.side ? 'Next trigger if this one closes' : 'Watching for'}: <b>${w.side}</b> on ${w.rule}
+      → from <b>${fmt(w.trigger)}</b> to <b>${fmt(w.target)}</b>, stop <b>${fmt(w.stop)}</b>${w.trend ? ` · ${w.trend_label || 'trend'} <b>${w.trend}</b>` : ''}</div>`;
+  const sideWarn = (sig.side==='SELL' && st.sells>=20 && st.sell_win_rate < 0.4) ?
+    `<div class="note">Caution: SELL trades from this setup have a poor record here (${st.sells} trades, ${pct(st.sell_win_rate)} won). Many traders only take the BUY side on indices — tick "long-only" above to see that version.</div>` : '';
+  const pf = st.profit_factor === null ? '∞' : isFinite(st.profit_factor) ? st.profit_factor.toFixed(2) : '∞';
+  return `
+  <div class="card">
+    <h3>${title}</h3>
+    <p class="rule">${rule}</p>
+    <span class="side ${side}">${label}</span><span class="status">${status}</span>
+    ${levels}${sig.news_warning ? `<div class="note red">⚠ ${sig.news_warning}</div>` : ''}${sideWarn}${extraNote ? `<div class="note">${extraNote}</div>` : ''}
+    <div class="stats">
+      <div><span>trades</span><b>${st.trades}</b></div>
+      <div><span>won</span><b>${pct(st.win_rate)}</b></div>
+      <div><span>hit full target</span><b>${pct(st.target_rate)}</b></div>
+      <div><span>avg per trade</span><b>${r2(st.avg_r)}</b></div>
+      <div><span>profit factor</span><b>${pf}</b></div>
+      <div><span>total</span><b>${r2(st.total_r)}</b></div>
+      <div><span>worst drawdown</span><b>${st.max_dd_r.toFixed(1)}R</b></div>
+      <div><span>avg hold</span><b>${st.avg_bars.toFixed(0)} bars</b></div>
+    </div>
+    ${equitySvg(equity)}
+    ${watch}
+    <details><summary>last ${trades.length} trades</summary>${tradeTable(trades)}</details>
+  </div>`;
+}
+
+function equitySvg(eq){
+  if (!eq || eq.length < 2) return '';
+  const W=600,H=70,P=4; const ys = eq.map(e=>e.r); const mn=Math.min(0,...ys), mx=Math.max(0,...ys);
+  const x = i => P + i*(W-2*P)/(eq.length-1), y = v => H-P-(v-mn)*(H-2*P)/((mx-mn)||1);
+  const d = eq.map((e,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(e.r).toFixed(1)}`).join(' ');
+  const last = ys[ys.length-1];
+  return `<div style="position:relative"><svg class="eq" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <line x1="${P}" x2="${W-P}" y1="${y(0)}" y2="${y(0)}" stroke="#e5e7eb" stroke-dasharray="3 3"/>
+    <path d="${d}" fill="none" stroke="${last>=0?'#0f9d58':'#d93025'}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+  </svg><span style="position:absolute;right:0;top:0;font-size:11px;color:var(--mute)">${r2(last)} cumulative over ${eq.length} trades</span></div>`;
+}
+
+function tradeTable(tr){
+  if (!tr.length) return '<p class="rule">none yet</p>';
+  return `<table><tr><th>entered</th><th>side</th><th>from</th><th>to</th><th>stop</th><th>exit</th><th>how</th><th>result</th></tr>
+  ${tr.map(t=>`<tr><td>${t.entry_time}</td><td style="color:${t.side==='BUY'?'var(--buy)':'var(--sell)'};font-weight:700">${t.side}</td>
+    <td>${fmt(t.entry)}</td><td>${fmt(t.target)}</td><td>${fmt(t.stop)}</td><td>${t.exit!=null?fmt(t.exit):'—'}</td>
+    <td>${t.reason==='open'?'live':t.reason}</td><td class="${t.r>=0?'pos':'neg'}">${r2(t.r)} (${t.pct>=0?'+':''}${t.pct.toFixed(1)}%)</td></tr>`).join('')}</table>`;
+}
+
+function rate(st){ return st.work_rate == null ? 'no textbook direction' : `${st.worked}/${st.worked+st.failed} worked (${pct(st.work_rate)})`; }
+function verdict(st){
+  if (st.work_rate == null) return '';
+  const dec = st.worked + st.failed;
+  if (dec < 20) return ' — too few cases to judge';
+  if (st.work_rate >= 0.56) return ' — has an edge here';
+  if (st.work_rate <= 0.44) return ' — tends to FAIL here (the opposite trade worked more often)';
+  return ' — coin-flip here, no edge';
+}
+
+function patternCard(rep){
+  const P = rep.patterns || {}, T = rep.trendlines || {};
+  const f = P.forming;
+  const forming = f ? `<div><span class="side ${f.direction>0?'BUY':f.direction<0?'SELL':'NONE'}" style="font-size:20px">${f.name.toUpperCase()}</span>
+      <span class="status">${f.direction>0?'textbook: bullish':f.direction<0?'textbook: bearish':'textbook: direction comes from the break'}</span>
+      <p class="rule" style="margin:4px 0">${f.text}. ${f.note}${f.level!=null ? ` · break level <b>${fmt(f.level)}</b>` : ''}</p>
+      <div style="font-size:13px">Record of this pattern on ${rep.name} ${rep.tf_label}: <b>${rate(f.stats)}</b>${verdict(f.stats)} (${f.stats.n} seen)</div></div>`
+    : `<div style="color:var(--mute)">No classical chart pattern on the last swing pivots right now.</div>`;
+  const cands = (P.recent_candles || []).filter(c => c.bar <= 1);
+  const candleHtml = cands.length ? cands.map(c => `<div style="margin-top:6px"><b style="color:${c.direction>0?'var(--buy)':c.direction<0?'var(--sell)':'var(--mute)'}">${c.name}</b>
+      <span class="status">${c.bar===0?'latest closed candle':'previous candle'} · ${c.text}</span>
+      ${c.stats ? `<div style="font-size:13px">record here: <b>${rate(c.stats)}</b>${verdict(c.stats)} (${c.stats.n} seen)</div>` : ''}</div>`).join('')
+    : `<div style="color:var(--mute);margin-top:6px">No candlestick pattern on the last two candles.</div>`;
+  const linesHtml = (T.lines || []).length ? T.lines.map(l => `<div style="margin-top:4px"><b>${l.kind}</b> line through ${l.touches} swing ${l.kind==='resistance'?'highs':'lows'}, now at <b>${fmt(l.now)}</b>
+      <span class="status">${Math.abs(l.slope_atr_per_100) < 1 ? 'flat' : (l.slope_atr_per_100>0?'rising':'falling') + ` ${Math.abs(l.slope_atr_per_100).toFixed(1)} ATR per 100 bars`}</span></div>`).join('')
+      + (T.channel ? `<div style="margin-top:4px;color:var(--accent)"><b>Parallel → this is a channel.</b> Bounce rule is active (see its card).</div>` : '')
+    : `<div style="color:var(--mute)">No trendline with 2+ respected touches on the recent pivots.</div>`;
+  const tbl = (rows) => `<table><tr><th>pattern</th><th>seen</th><th>worked</th><th>failed</th><th>rate</th><th>verdict</th></tr>
+    ${rows.map(s => `<tr><td>${s.name}</td><td>${s.n}</td><td>${s.worked}</td><td>${s.failed}</td><td>${s.work_rate==null?'—':pct(s.work_rate)}</td><td style="white-space:normal">${verdict(s).replace(/^ — /,'')}</td></tr>`).join('')}</table>`;
+  return `
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
+    <div class="card"><h3>Chart pattern forming</h3>${forming}
+      <details><summary>every chart pattern's record on ${rep.name} ${rep.tf_label}</summary><p class="rule">${P.rule || ''}</p>${tbl(P.chart_stats || [])}</details></div>
+    <div class="card"><h3>Candlestick patterns</h3>${candleHtml}
+      <details><summary>every candlestick pattern's record here</summary>${tbl(P.candle_stats || [])}</details></div>
+    <div class="card"><h3>Trendlines &amp; channel</h3>${linesHtml}
+      <p class="rule" style="margin-top:8px">Lines are drawn on the chart below (dashed). The <i>trendline break</i> and <i>channel bounce</i> cards show what trading them has actually returned here.</p></div>
+  </div>`;
+}
+
+function paintVerdict(rep){
+  const v = rep.verdict; if (!v) return;
+  const el = $('#verdict');
+  el.className = 'verdict ' + (v.state === 'signal' ? v.side : v.state);
+  el.querySelector('.h').textContent = (v.state === 'signal' ? (v.side === 'BUY' ? '▲ ' : '▼ ') : v.state === 'news' ? '⚠ ' : '⏸ ') + v.headline;
+  el.querySelector('.d').textContent = v.detail;
+  const arrow = x => x === 'up' ? '<span class="tr-up">▲</span>' : x === 'down' ? '<span class="tr-down">▼</span>' : '—';
+  const tr = v.trends || {};
+  const meta = [];
+  meta.push(`Trend (200 EMA): ${['1d','1h','15m','5m'].map(k => `${k.toUpperCase()} ${arrow(tr[k])}`).join(' · ')} ${v.aligned ? '<b class="tr-up">all aligned</b>' : '<span>mixed</span>'}`);
+  if (v.confluence) meta.push(`Rules agreeing now: <b>${v.confluence.buy.length}</b> BUY · <b>${v.confluence.sell.length}</b> SELL of ${v.confluence.of}`);
+  if (v.session) meta.push(`Session: <b>${v.session.name}</b> — ${v.session.note}`);
+  if (v.warning) meta.push(`<span class="warn">⚠ ${v.warning}</span>`);
+  el.querySelector('.meta').innerHTML = meta.map(m => `<span>${m}</span>`).join('');
+  paintLiveTrigger();
+}
+// while the candle is still forming: is price already past a trigger? (it only counts on the close)
+function paintLiveTrigger(){
+  const el = $('#verdict .now'); if (!el) return;
+  const v = curRep && curRep.verdict;
+  if (!v || !['wait', 'running'].includes(v.state) || lastPx == null) { el.textContent = ''; return; }
+  const hit = (v.triggers || []).find(t => (t.kind === 'above' && lastPx > t.price) || (t.kind === 'below' && lastPx < t.price));
+  if (!hit) { el.textContent = ''; return; }
+  const now = Date.now(), left = Math.max(0, Math.round((closesAt(bucketOf(now, curRep.tf), curRep.tf) - now) / 1000));
+  el.style.color = hit.side === 'BUY' ? 'var(--buy)' : 'var(--sell)';
+  el.textContent = `⚡ price ${fmtPx(lastPx)} is ${hit.kind} the ${hit.side} trigger ${fmtPx(hit.price)} (${hit.setup}) — a ${hit.side} fires only if this candle CLOSES ${hit.kind} it · closes in ${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}`;
+}
+
+const slug = x => x.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+function orderedSetups(rep){
+  const rank = Object.fromEntries((rep.scoreboard || []).map((r, i) => [r.setup, i]));
+  return [...rep.setups].sort((a, b) => (rank[a.setup] ?? 99) - (rank[b.setup] ?? 99));
+}
+function scoreboardCard(rep){
+  const rows = rep.scoreboard || [];
+  if (!rows.length) return '';
+  const r2s = v => v == null ? '—' : r2(v);
+  const body = rows.map((r, i) => {
+    const thin = r.trades < 30;
+    const now = r.status === 'signal' ? `<span class="badge ${r.side}">${r.side} now</span>` : r.status === 'open' ? `<span class="badge ${r.side}">${r.side} running</span>` : '<span class="badge none">—</span>';
+    const cls = v => v == null ? '' : v > 0.03 ? 'good' : v < 0 ? 'bad' : '';
+    return `<tr class="row ${thin ? 'thin' : ''}" onclick="document.getElementById('card-${slug(r.setup)}').scrollIntoView({behavior:'smooth',block:'center'})">
+      <td>${i + 1}</td><td><b>${r.setup}</b></td><td>${now}</td><td>${r.trades}</td><td>${pct(r.win_rate)}</td>
+      <td class="${cls(r.avg_r)}">${r2(r.avg_r)}</td><td>${r.profit_factor == null ? '∞' : r.profit_factor.toFixed(2)}</td>
+      <td>${r.max_dd_r.toFixed(1)}R</td><td class="${cls(r.recent_avg_r)}">${r2s(r.recent_avg_r)} <span style="color:var(--mute)">(${r.recent_n})</span></td></tr>`;
+  }).join('');
+  return `<div class="card" style="margin-bottom:16px"><h3>Strategy scoreboard · ${rep.name} ${rep.tf_label}</h3>
+    <p class="rule">Every rule replayed on all ${rep.history.bars.toLocaleString('en-IN')} candles (market hours only), ranked by average result per trade <b>after a ${fmtPx(rep.params.cost)} spread</b>.
+    Green = positive edge, red = loses money here. "Last 30 days" shows whether the edge is still working. Grey rows have under 30 trades, too few to judge. Click a row for its card.</p>
+    <div class="tscroll"><table class="sb"><tr><th>#</th><th>rule</th><th>now</th><th>trades</th><th>won</th><th>avg / trade</th><th>profit factor</th><th>worst drawdown</th><th>last 30 days</th></tr>${body}</table></div></div>`;
+}
+
+// ── markets: tabs, add, remove ─────────────────────────────────────────────────
+let symMeta = null;
+function renderTabs(){
+  const meta = ST ? (stMeta || stArgs.meta) : symMeta;
+  if (!meta) return;
+  const many = meta.symbols.length > 1;
+  $('#tabs').innerHTML = meta.symbols.map(s => `<button class="tab ${s.symbol===state.symbol?'on':''}" data-s="${s.symbol}" title="${s.name}">${s.short || s.name}${many ? `<span class="x" data-s="${s.symbol}" title="remove ${s.short}">×</span>` : ''}</button>`).join(' ')
+    + ` <button class="tab add" id="addBtn">+ Add market</button>`;
+}
+function pickSymbol(sym){
+  state.symbol = sym; localStorage.setItem('sb.symbol', sym);
+  renderTabs(); $('#addPanel').style.display = 'none';
+  load();
+}
+async function toggleAdd(){
+  const p = $('#addPanel');
+  if (p.style.display === 'block') { p.style.display = 'none'; return; }
+  p.style.display = 'block';
+  const meta = ST ? (stMeta || stArgs.meta) : await (await fetch('/api/symbols')).json();
+  const have = new Set(meta.symbols.map(s => s.td));
+  const groups = {'Precious Metal': 'Metals', 'Physical Currency': 'Forex', 'Digital Currency': 'Crypto', 'ETF': 'US stocks & ETFs', 'Common Stock': 'US stocks & ETFs'};
+  const by = {};
+  for (const m of meta.popular || []) (by[groups[m.type] || 'Other'] ||= []).push(m);
+  $('#popular').innerHTML = Object.entries(by).map(([g, ms]) => `<div class="pg"><span class="pgl">${g}</span>${ms.map(m =>
+    `<button class="chip ${have.has(m.td) ? 'on' : ''}" data-td="${m.td}" data-name="${m.name}" data-type="${m.type}">${m.td}</button>`).join('')}</div>`).join('');
+  setTimeout(() => $('#q').focus(), 50);
+}
+async function searchMarkets(){
+  const q = $('#q').value.trim(); if (!q) return;
+  $('#results').innerHTML = '<span class="tickstate">searching… (uses 1 Twelve Data credit)</span>';
+  let res;
+  if (ST) res = await new Promise(r => { const nonce = Date.now(); stSearchPending = {nonce, res: r}; stSend('streamlit:setComponentValue', {value: {search: q, nonce}, dataType: 'json'}); });
+  else res = (await (await fetch('/api/search?q=' + encodeURIComponent(q))).json()).results || [];
+  $('#results').innerHTML = res.length ? res.map(r => `<button class="chip res" data-td="${r.td}" data-name="${(r.name || '').replace(/"/g, '')}" data-type="${r.type}" data-ex="${r.exchange || ''}">
+      <b>${r.td}</b> <span>${r.name || ''}</span> <small>${r.type}${r.exchange ? ' · ' + r.exchange : ''}</small></button>`).join('')
+    : '<span class="tickstate">nothing found that the free plan streams — try a ticker like XAG/USD, EUR/USD, BTC or AAPL</span>';
+}
+async function addMarket(item){
+  if (ST) {
+    stPending = rep => { state.symbol = rep.symbol; state.tf = rep.tf; renderTabs(); $('#addPanel').style.display = 'none'; load(); };
+    stRequest({add: item, tf: state.tf});
+    $('#results').innerHTML = `<span class="tickstate">adding ${item.td} — downloading its history (first time only, ~30 s)…</span>`;
+    return;
+  }
+  $('#results').innerHTML = `<span class="tickstate">adding ${item.td} — downloading its history (first time only, ~30 s)…</span>`;
+  const r = await (await fetch('/api/watchlist?add=' + encodeURIComponent(JSON.stringify(item)))).json();
+  symMeta.symbols = r.symbols;
+  pickSymbol(r.added);
+}
+async function removeMarket(sym){
+  if (!confirm('Remove ' + sym + ' from your markets?')) return;
+  if (ST) { stRequest({remove: sym, tf: state.tf}); if (state.symbol === sym) state.symbol = null; return; }
+  const r = await (await fetch('/api/watchlist?remove=' + encodeURIComponent(sym))).json();
+  symMeta.symbols = r.symbols;
+  if (state.symbol === sym) state.symbol = r.symbols[0].symbol;
+  pickSymbol(state.symbol);
+}
+
+function volHead(v){
+  if (!v) return '';
+  const bits = [];
+  if (v.comex != null) bits.push(`${v.label || 'volume'} ${Math.round(v.comex).toLocaleString('en-US')}${v.rvol != null ? ` (<b style="color:${v.rvol >= 1.5 ? 'var(--buy)' : 'inherit'}">${v.rvol.toFixed(1)}×</b> avg)` : ''}`);
+  if (v.ticks != null) bits.push(`${Math.round(v.ticks)} ticks${v.rvol_tick != null ? ` (<b style="color:${v.rvol_tick >= 1.5 ? 'var(--buy)' : 'inherit'}">${v.rvol_tick.toFixed(1)}×</b> avg)` : ''}`);
+  if (!bits.length) return v.comex_until ? `<span style="color:var(--mute)">volume: ${v.label || 'volume'} printed up to ${v.comex_until.slice(11) || v.comex_until}</span>` : '';
+  return `<span style="color:var(--mute)">last candle volume: ${bits.join(' · ')}</span>`;
+}
+
+function titleFor(rep, s){
+  const tf = rep.tf_label;
+  return s.setup === 'orb' ? `${tf} · opening range` : `${tf} · ${s.setup}`;
+}
+
+function render(rep){
+  const session = rep.intraday ? (rep.flat_by_close ? ` · flat by close, no entries after ${rep.last_entry}` : (rep.session === '24h' ? ' · 24-hour market, positions carry' : ' · positions may run overnight')) : '';
+  const nw = rep.news || {events: []};
+  const evRows = nw.events.map(e => `<tr><td>${e.time.slice(5)}</td><td><span class="imp ${e.impact}"></span>${e.impact}</td><td>${e.country}</td><td style="white-space:normal">${e.title}</td><td>${e.forecast || '—'}</td><td>${e.previous || '—'}</td><td>${e.minutes_away < 0 ? 'released' : e.minutes_away < 60 ? `in ${e.minutes_away} min` : `in ${(e.minutes_away/60).toFixed(1)} h`}</td></tr>`).join('');
+  const newsStrip = `
+    <div class="news ${nw.in_blackout ? 'hot' : ''}">
+      <b class="t">${nw.in_blackout ? '⚠ ' + nw.blackout_text : 'News: ' + nw.next_text}</b>
+      <span style="color:${nw.in_blackout ? '#991b1b' : 'var(--mute)'};font-size:13px"> · rule: ${nw.window_rule || ''} · ${nw.source || ''}</span>
+      <details><summary>upcoming releases that move ${rep.name} (${nw.events.length})</summary>
+        <table><tr><th>time (IST)</th><th>impact</th><th>ccy</th><th>event</th><th>forecast</th><th>previous</th><th></th></tr>${evRows || '<tr><td colspan=7>nothing in the next 3 days</td></tr>'}</table>
+      </details>
+    </div>`;
+  $('#main').innerHTML = `
+    ${scoreboardCard(rep)}
+    <div class="head">
+      <b>${rep.name}</b>
+      <span>${fmt(rep.last_close)} <span style="color:var(--mute)">last ${rep.tf_label.toLowerCase()} close ${rep.as_of}</span></span>
+      <span class="pill ${rep.trend}">${rep.trend==='up'?'uptrend':'downtrend'}</span>
+      ${volHead(rep.volume)}
+      <span style="color:var(--mute)">200-bar EMA ${fmt(rep.ema_trend)} · ATR ${fmt(rep.atr)} · ${rep.history.bars.toLocaleString('en-IN')} bars from ${rep.history.from}${session}</span>
+    </div>
+    ${newsStrip}
+    <div class="grid">
+      ${orderedSetups(rep).map(s => `<div id="card-${slug(s.setup)}">${signalCard(titleFor(rep, s), s.text, s.signal, s.stats, s.caveat, s.equity, s.trades)}</div>`).join('')}
+    </div>
+    ${patternCard(rep)}`;
+  $('#chartTitle').textContent = `${rep.name} · ${rep.tf_label}`;
+  paintVerdict(rep);
+  drawChart(rep);
+}
+
+function drawChart(rep){
+  const el = $('#chart');
+  if (!window.LightweightCharts) { el.innerHTML = '<p class="rule">chart library did not load (offline?) — the numbers above are unaffected</p>'; return; }
+  const key = rep.symbol + '|' + rep.tf;
+  const fresh = !chart || cs.key !== key;
+  if (fresh) {
+    if (chart) { try { cs.ro && cs.ro.disconnect(); chart.remove(); } catch (e) {} }
+    el.innerHTML = '';
+    chart = LightweightCharts.createChart(el, {width: el.clientWidth || 900, height: el.clientHeight || 480, layout:{textColor:'#374151',background:{type:'solid',color:'#fff'}},
+      grid:{vertLines:{color:'#f3f4f6'},horzLines:{color:'#f3f4f6'}}, rightPriceScale:{borderColor:'#e5e7eb'},
+      timeScale:{borderColor:'#e5e7eb', timeVisible: rep.intraday, secondsVisible:false, rightOffset: 6}});
+    candles = chart.addCandlestickSeries({upColor:'#0f9d58',downColor:'#d93025',borderVisible:false,wickUpColor:'#0f9d58',wickDownColor:'#d93025'});
+    candles.priceScale().applyOptions({scaleMargins: {top: 0.11, bottom: 0.26}});
+    const sesS = chart.addHistogramSeries({priceScaleId: 'ses', lastValueVisible: false, priceLineVisible: false, base: 0,
+      autoscaleInfoProvider: () => ({priceRange: {minValue: 0, maxValue: 1}})});
+    chart.priceScale('ses').applyOptions({scaleMargins: {top: 0, bottom: 0.978}, visible: false});
+    const volS = chart.addHistogramSeries({priceScaleId: 'vol', priceFormat: {type: 'volume'}, lastValueVisible: false, priceLineVisible: false});
+    chart.priceScale('vol').applyOptions({scaleMargins: {top: 0.78, bottom: 0}, visible: false});
+    const tickS = chart.addLineSeries({priceScaleId: 'tick', color: '#2563eb', lineWidth: 1, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false});
+    chart.priceScale('tick').applyOptions({scaleMargins: {top: 0.78, bottom: 0}, visible: false});
+    cs = {key, el, volS, tickS, sesS, e200: chart.addLineSeries({color:'#7c3aed',lineWidth:1.5,title:'EMA 200', lastValueVisible:true}),
+          e20: chart.addLineSeries({color:'#f59e0b',lineWidth:1,title:'EMA 20'}), extras: [], priceLines: [], range: null};
+    if (rep.intraday) chart.timeScale().applyOptions({tickMarkFormatter: (t) => { const d = new Date(t*1000); const hh = String(d.getUTCHours()).padStart(2,'0'), mm = String(d.getUTCMinutes()).padStart(2,'0'); return ((hh==='09'&&mm==='15') || (hh==='00'&&mm==='00')) ? `${d.getUTCDate()}/${d.getUTCMonth()+1}` : `${hh}:${mm}`; }});
+    chart.applyOptions({localization:{timeFormatter: (t) => { if (typeof t === 'string') return t; const d = new Date(t*1000); return `${d.getUTCDate()}/${d.getUTCMonth()+1} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; }}});
+    // remember the user's zoom/scroll so a refresh doesn't snap it back
+    chart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (cs.userMoved) cs.range = r; });
+    el.addEventListener('wheel', () => cs.userMoved = true, {passive:true});
+    el.addEventListener('mousedown', () => cs.userMoved = true);
+    cs.ro = new ResizeObserver(()=>{ chart.resize(el.clientWidth, el.clientHeight); if (!cs.userMoved) chart.timeScale().fitContent(); });
+    cs.ro.observe(el);
+  } else {
+    for (const sr of cs.extras) chart.removeSeries(sr);
+    for (const pl of cs.priceLines) candles.removePriceLine(pl);
+    cs.extras = []; cs.priceLines = [];
+  }
+
+  const prec = decs(rep.last_close);
+  for (const sr of [candles, cs.e200, cs.e20]) sr.applyOptions({priceFormat: {type: 'price', precision: prec, minMove: Math.pow(10, -prec)}});
+  candles.setData(rep.chart.bars.map(b=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));
+  cs.e200.setData(rep.chart.ema_trend);
+  cs.volS.setData(rep.chart.vol || []);
+  drawSessions(rep);
+  cs.tickS.setData(rep.chart.tvol || []);
+  const tv = (rep.chart.tvol || []).slice(-20).map(x => x.value);
+  cs.tickAvg = tv.length >= 10 ? tv.reduce((a, b) => a + b, 0) / tv.length : null;
+  cs.e20.setData(rep.chart.ema_pull);
+
+  // levels of the active signal (or of the nearest trigger)
+  // a NEW signal: its entry / target / stop; otherwise the triggers that would end the no-trade zone
+  const newSig = rep.setups.map(s=>s.signal).find(s=>s.status==='signal');
+  const running = rep.setups.map(s=>s.signal).find(s=>s.status==='open');
+  const shown = newSig || running;
+  if (shown) {
+    for (const [t,v,c] of [['entry',shown.entry,'#2563eb'],['target',shown.target,'#0f9d58'],['stop',shown.stop,'#d93025']])
+      if (v!=null) cs.priceLines.push(candles.createPriceLine({price:v,color:c,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(newSig ? '' : 'running · ') + t}));
+  }
+  const lv = (rep.verdict?.triggers || []).filter(t => t.kind !== 'ema');
+  const oneEach = [lv.find(t => t.kind === 'above'), lv.find(t => t.kind === 'below')].filter(Boolean);
+  for (const t of oneEach)
+    cs.priceLines.push(candles.createPriceLine({price: t.price, color: t.side==='BUY' ? '#0f9d58' : '#d93025', lineWidth: 1, lineStyle: 0,
+      axisLabelVisible: true, title: `${t.side} if close ${t.kind}`}));
+
+  // trendlines: two points, extended past the last candle on intraday charts
+  const bars = rep.chart.bars, lastBar = bars[bars.length-1], firstT = bars[0].time;
+  const stepT = rep.bar_step;
+  for (const l of (rep.trendlines?.lines || [])) {
+    const t0 = l.from.t, lastIdx = bars.length - 1, nFromEnd = l.to.i - (rep.history.bars - 1);   // bars past the end
+    const t1 = (rep.intraday && stepT) ? lastBar.time + stepT * nFromEnd : lastBar.time;
+    const p1 = (rep.intraday && stepT) ? l.to.price : l.now;
+    if (t0 < firstT) continue;                       // starts before the visible history — skip rather than mis-draw
+    const sr = chart.addLineSeries({color: l.kind==='resistance' ? '#d93025' : '#0f9d58', lineWidth:1, lineStyle:1,
+                                    title: `${l.kind} (${l.touches} touches)`, lastValueVisible:false, priceLineVisible:false, crosshairMarkerVisible:false});
+    sr.setData([{time:t0, value:l.from.price}, {time:t1, value:p1}]);
+    cs.extras.push(sr);
+  }
+  // the forming chart pattern: connect its pivots
+  const f = rep.patterns?.forming;
+  if (f && f.pivots.length >= 3 && f.pivots[0].t >= firstT) {
+    const sr = chart.addLineSeries({color:'#7c3aed', lineWidth:2, lineStyle:0, title: f.name, lastValueVisible:false, priceLineVisible:false});
+    sr.setData(f.pivots.map(p => ({time:p.t, value:p.price})));
+    cs.extras.push(sr);
+    if (f.level != null) cs.priceLines.push(candles.createPriceLine({price:f.level, color:'#7c3aed', lineWidth:1, lineStyle:3, axisLabelVisible:true, title:'pattern break'}));
+  }
+
+  const markers = [];
+  // High/Medium releases inside the chart's range, pinned to the first candle at or after them
+  const barTimes = bars.map(b => b.time);
+  for (const e of (rep.news?.events || [])) {
+    if (e.impact === 'Low') continue;
+    const t = rep.intraday ? e.ts : e.time.slice(0, 10);
+    const idx = barTimes.findIndex(bt => bt >= t);
+    if (idx < 0) continue;
+    markers.push({time: barTimes[idx], position: 'aboveBar', shape: 'square',
+                  color: e.impact === 'High' ? '#d93025' : '#f59e0b', text: '📰 ' + e.title.slice(0, 22)});
+  }
+  markers.sort((a,b) => (a.time > b.time) - (a.time < b.time));
+  candles.setMarkers(markers);
+
+  if (innerWidth < 760) {     // phones: price tags on the axis only, no line labels across the chart
+    for (const pl of cs.priceLines) pl.applyOptions({title: ''});
+    for (const sr of [...cs.extras, cs.e200, cs.e20]) sr.applyOptions({title: ''});
+  }
+  if (fresh || !cs.userMoved) chart.timeScale().fitContent();
+  else if (cs.range) chart.timeScale().setVisibleLogicalRange(cs.range);
+}
+if (!ST) init();
+</script>
+</body>
+</html>
