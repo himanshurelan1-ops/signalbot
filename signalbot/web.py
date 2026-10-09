@@ -24,7 +24,7 @@ CACHE_SECONDS = 300
 
 
 #: intraday pages go stale fast; daily can sit for a while
-CACHE_BY_TF = {"1d": 300, "1h": 300, "15m": 120, "5m": 60}
+CACHE_BY_TF = {"1w": 900, "1d": 300, "4h": 300, "1h": 300, "30m": 120, "15m": 120, "5m": 60, "1m": 30}
 
 
 def report_cached(symbol: str, root: Path, tf: str, long_only: bool, flat: bool | None,
@@ -117,7 +117,7 @@ def make_handler(root: Path, page: str):
                     "version": VERSION,
                     "symbols": symbols_meta(),
                     "popular": popular_meta(),
-                    "timeframes": [{"tf": k, "label": v["label"]} for k, v in TIMEFRAMES.items()],
+                    "timeframes": [{"tf": k, "label": v["label"], "short": v["short"]} for k, v in TIMEFRAMES.items()],
                 })
             if u.path == "/api/search":
                 from . import twelvedata

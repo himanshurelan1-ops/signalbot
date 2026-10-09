@@ -75,7 +75,7 @@ def test_web_serves_page_and_report(offline):
         assert "signalbot" in html
         meta = json.loads(urlopen(f"http://127.0.0.1:{port}/api/symbols").read())
         assert {s["symbol"] for s in meta["symbols"]} == {"XAUUSD"}
-        assert [t["tf"] for t in meta["timeframes"]] == ["1d", "1h", "15m", "5m"]
+        assert [t["tf"] for t in meta["timeframes"]] == ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"]
         rep = json.loads(urlopen(f"http://127.0.0.1:{port}/api/report?symbol=XAUUSD&tf=15m&stop_atr=1.5").read())
         assert rep["symbol"] == "XAUUSD" and rep["tf"] == "15m" and rep["params"]["stop_atr"] == 1.5
     finally:

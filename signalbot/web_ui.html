@@ -48,7 +48,12 @@
   th{text-align:left;color:var(--mute);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:6px 6px;border-bottom:1px solid var(--line)}
   td{padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
   td.pos{color:var(--buy)}td.neg{color:var(--sell)}
-  .chartcard{padding:12px 14px 14px;margin-bottom:16px;position:relative}
+  .chartcard{padding:12px 14px 14px;margin-bottom:12px;position:relative}
+  .top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:0 0 10px}
+  .brand{font-size:18px;letter-spacing:.2px}
+  #tfs{display:none}                          /* the timeframe buttons on the chart do the job */
+  details.key summary{margin-top:6px}
+  .chartcard:fullscreen details.key,.chartcard:-webkit-full-screen details.key{display:none}
   #chartLoading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;
     background:rgba(255,255,255,.82);z-index:20;border-radius:14px;padding:20px;font-size:15px}
   .chartbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-bottom:8px}
@@ -108,7 +113,7 @@
     h1{font-size:18px}.sub{display:none}
     .bar{gap:6px 8px;margin-bottom:10px}
     .tab{padding:6px 10px;font-size:13px}.tab.tf{padding:5px 9px}
-    #tfs{display:none}                         /* the timeframe buttons on the chart do the job */
+    #chartTfs .tab.tf{padding:4px 7px;font-size:12px}
     .chartcard{padding:8px 8px 10px}
     .chartbar{gap:6px 10px}.chartbar h3{font-size:11px}
     .px{font-size:19px}
@@ -128,22 +133,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>signalbot</h1>
-  <p class="sub">What the rules say right now for gold and any market you add, on daily, hourly, 15-minute and 5-minute candles — how those exact rules have done across every bar on record — and when the news calendar says to stay out.</p>
-
-  <div class="bar">
-    <div id="tabs"></div>
-    <div id="tfs" style="margin-left:6px"></div>
-    <label class="tog" id="flatWrap" style="margin-left:0;display:none"><input type="checkbox" id="flat"> flat by close</label>
-    <label class="tog" style="margin-left:0"><input type="checkbox" id="longOnly"> long-only</label>
-    <span class="tog" style="margin-left:0">stop <input id="stopAtr" type="number" step="0.5" min="0.5" style="width:52px"> × ATR</span>
-    <span class="tog" style="margin-left:0">target <input id="tgtAtr" type="number" step="0.5" min="0.5" style="width:52px"> × ATR</span>
-    <span class="tog" style="margin-left:0">time stop <input id="maxBars" type="number" step="1" min="1" style="width:52px"> bars</span>
-    <span class="tog" style="margin-left:0" title="round-trip spread + commission taken off every backtested trade">spread $ <input id="cost" type="number" step="0.05" min="0" style="width:60px"></span>
-    <button class="ghost" id="refresh">Refresh</button>
-    <span id="auto" style="color:var(--mute);font-size:12px"></span>
-    <span id="src" style="margin-left:auto;font-size:13px;color:var(--mute)"></span>
-  </div>
+  <div class="top"><b class="brand">signalbot</b><div id="tabs"></div></div>
   <div id="addPanel" class="card" style="display:none;margin:-6px 0 14px">
     <h3>Add a market</h3>
     <p class="rule">One click for the popular ones (no API credits), or search anything Twelve Data's free plan streams: forex, metals, crypto, US stocks and ETFs. Indian NSE/BSE stocks need a paid Twelve Data plan.</p>
@@ -152,8 +142,6 @@
       <button class="ghost" id="qBtn">Search</button></div>
     <div id="results" style="margin-top:10px"></div>
   </div>
-  <div style="display:flex;gap:16px;flex-wrap:wrap;margin:-8px 0 14px;font-size:12px;color:var(--mute)"><span id="ltp" style="font-weight:700;color:var(--ink)"></span><span id="live"></span></div>
-
   <div class="card chartcard" id="chartCard">
     <div class="chartbar">
       <h3 id="chartTitle">signalbot</h3>
@@ -164,17 +152,33 @@
       <label class="tog" style="margin-left:auto" title="previous-day high/low, Asian range, equal highs/lows, fair value gaps, order blocks, sweeps, structure breaks"><input type="checkbox" id="smcTog"> Liquidity / SMC</label>
       <button class="ghost fsbtn" id="fsBtn" title="Full screen (F) — Esc to exit" style="margin-left:0">⛶ Full screen</button>
     </div>
-    <div id="verdict" class="verdict wait"><b class="h">…</b><div class="d"></div><div class="now"></div><div class="meta"></div></div>
     <div id="chart"></div>
-    <div class="tickstate" style="margin-top:6px">Session strip (top of chart): <b style="color:#7c3aed">Asia</b> 05:30–12:30 IST · <b style="color:#2563eb">London</b> 12:30–17:30 · <b style="color:#0f9d58">London + NY</b> 17:30–21:30 (most liquid) · <b style="color:#ea580c">New York</b> 21:30–02:30 · <b style="color:#6b7280">after hours</b> 02:30–05:30.<br>Liquidity / SMC: <b style="color:#0f9d58">green</b> / <b style="color:#d93025">red</b> line pairs = unfilled bullish / bearish fair value gaps · <b style="color:#7c3aed">purple</b> pairs = order blocks · <b style="color:#f59e0b">orange</b> = equal highs/lows (resting stops) and <b style="color:#f59e0b">● sweep</b> marks · <b style="color:#0ea5e9">blue</b> = previous day high/low · arrows = latest BOS/CHoCH.<br>Volume pane: <b style="color:#0f9d58">bars</b> = COMEX gold futures contracts per candle (solid = ≥1.5× the 20-candle average, faded = normal; ~10 min delayed) · <b style="color:#2563eb">blue line</b> = live tick volume (price updates per candle, counts up as ticks arrive)</div>
+    <div id="verdict" class="verdict wait" style="margin:10px 0 4px"><b class="h">…</b><div class="d"></div><div class="now"></div><div class="meta"></div></div>
+    <details class="key"><summary>Chart key — sessions, liquidity / SMC, volume</summary><div class="tickstate" style="margin-top:6px">Session strip (top of chart): <b style="color:#7c3aed">Asia</b> 05:30–12:30 IST · <b style="color:#2563eb">London</b> 12:30–17:30 · <b style="color:#0f9d58">London + NY</b> 17:30–21:30 (most liquid) · <b style="color:#ea580c">New York</b> 21:30–02:30 · <b style="color:#6b7280">after hours</b> 02:30–05:30.<br>Liquidity / SMC: <b style="color:#0f9d58">green</b> / <b style="color:#d93025">red</b> line pairs = unfilled bullish / bearish fair value gaps · <b style="color:#7c3aed">purple</b> pairs = order blocks · <b style="color:#f59e0b">orange</b> = equal highs/lows (resting stops) and <b style="color:#f59e0b">● sweep</b> marks · <b style="color:#0ea5e9">blue</b> = previous day high/low · arrows = latest BOS/CHoCH.<br>Volume pane: <b style="color:#0f9d58">bars</b> = COMEX gold futures contracts per candle (solid = ≥1.5× the 20-candle average, faded = normal; ~10 min delayed) · <b style="color:#2563eb">blue line</b> = live tick volume (price updates per candle, counts up as ticks arrive)</div></details>
   </div>
+
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin:0 0 10px;font-size:12px;color:var(--mute)"><span id="ltp" style="font-weight:700;color:var(--ink)"></span><span id="live"></span></div>
+
+  <div class="bar">
+        <div id="tfs" style="margin-left:6px"></div>
+    <label class="tog" id="flatWrap" style="margin-left:0;display:none"><input type="checkbox" id="flat"> flat by close</label>
+    <label class="tog" style="margin-left:0"><input type="checkbox" id="longOnly"> long-only</label>
+    <span class="tog" style="margin-left:0">stop <input id="stopAtr" type="number" step="0.5" min="0.5" style="width:52px"> × ATR</span>
+    <span class="tog" style="margin-left:0">target <input id="tgtAtr" type="number" step="0.5" min="0.5" style="width:52px"> × ATR</span>
+    <span class="tog" style="margin-left:0">time stop <input id="maxBars" type="number" step="1" min="1" style="width:52px"> bars</span>
+    <span class="tog" style="margin-left:0" title="round-trip spread + commission taken off every backtested trade">spread $ <input id="cost" type="number" step="0.05" min="0" style="width:60px"></span>
+    <button class="ghost" id="refresh">Refresh</button>
+    <span id="auto" style="color:var(--mute);font-size:12px"></span>
+    <span id="src" style="margin-left:auto;font-size:13px;color:var(--mute)"></span>
+  </div>
+  <p class="sub">What the rules say right now for gold and any market you add, from 1-minute to weekly candles — how those exact rules have done across every bar on record — and when the news calendar says to stay out.</p>
 
   <div id="main"><div class="skel">Loading history…</div></div>
 
   <p class="foot">
     Every number here is the rule's own record, replayed bar by bar with conservative fills (entry at the next open; when a bar touches both stop and target the stop is assumed first; gaps fill at the open).
     A BUY or SELL is the rule firing, not a forecast — the win rate beside it is how often this same situation worked out before, and it will not hold for any individual trade.
-    Spread and commission are not modelled. Not financial advice.
+    The spread (Rule settings) is taken off every trade. Not financial advice.
   </p>
 </div>
 
@@ -235,7 +239,7 @@ async function init(){
     const b = e.target.closest('.tab[data-s]'); if (!b) return;
     pickSymbol(b.dataset.s);
   };
-  $('#chartTfs').innerHTML = meta.timeframes.map(t => `<button class="tab tf ${t.tf===state.tf?'on':''}" data-tf="${t.tf}">${{'1d':'1D','1h':'1H','15m':'15m','5m':'5m'}[t.tf] || t.label}</button>`).join(' ');
+  $('#chartTfs').innerHTML = meta.timeframes.map(t => `<button class="tab tf ${t.tf===state.tf?'on':''}" data-tf="${t.tf}">${t.short || t.label}</button>`).join(' ');
   const pickTf = e => { const b = e.target.closest('.tab'); if(!b) return; state.tf = b.dataset.tf; localStorage.setItem('sb.tf', state.tf);
     document.querySelectorAll('#tfs .tab, #chartTfs .tab').forEach(t => t.classList.toggle('on', t.dataset.tf===state.tf)); load(); };
   $('#tfs').onclick = pickTf;
@@ -282,7 +286,7 @@ async function load(force=false){
     showLoading(true, `Loading ${nm ? nm.short : state.symbol} · ${state.tf}…`);
   }
   if (!$('#main .head')) $('#main').innerHTML = '<div class="skel">Downloading history and replaying the rules… (first run takes a few seconds)</div>';
-  const intraday = state.tf !== '1d';
+  const intraday = !DAILY_TF.includes(state.tf);
   const flat = intraday ? state.flat : '';
   const tune = `&stop_atr=${$('#stopAtr').value}&target_atr=${$('#tgtAtr').value}&max_bars=${$('#maxBars').value}&cost=${$('#cost').value}`;
   let rep;
@@ -304,7 +308,7 @@ async function load(force=false){
   // the rules re-run the moment a candle closes (driven by the live ticks, see onTick);
   // this timer is only a safety net for when the stream is silent
   clearTimeout(timer); clearInterval(tick);
-  const every = {'5m': 60, '15m': 120, '1h': 300, '1d': 900}[state.tf];
+  const every = {'1m': 45, '5m': 60, '15m': 120, '30m': 180, '1h': 300, '4h': 600, '1d': 900, '1w': 1800}[state.tf] || 300;
   const safety = () => { timer = setTimeout(() => { if (Date.now() - lastTickAt > 30000) load(true); else safety(); }, every * 1000); };
   safety();
   $('#auto').textContent = 'rules re-run the moment each candle closes';
@@ -323,15 +327,18 @@ async function load(force=false){
 
 // ── live: every tick is pushed by the local server (Server-Sent Events) the moment
 //    Twelve Data sends it; the forming candle and the price update on each one ─────
-const STEP = {'5m': 300, '15m': 900, '1h': 3600};
+const STEP = {'1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400};
+const DAILY_TF = ['1d', '1w'];
 let es = null, fc = null, curRep = null, liveTimer = null, reloadPending = false;
 let lastTickAt = 0, lastPx = null, streamState = 'connecting', streamMsg = '';
 function bucketOf(ms, tf){
   if (tf === '1d') return new Date(ms).toISOString().slice(0, 10);
+  if (tf === '1w') { const d = new Date(ms); d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7); return d.toISOString().slice(0, 10); }
   const st = STEP[tf]; return Math.floor(ms / 1000 / st) * st + 19800;       // chart time = IST wall clock
 }
 function closesAt(bucket, tf){
   if (tf === '1d') return Date.parse(bucket + 'T00:00:00Z') + 86400000;
+  if (tf === '1w') return Date.parse(bucket + 'T00:00:00Z') + 7 * 86400000;
   return (bucket - 19800 + STEP[tf]) * 1000;
 }
 function lastClosedTime(){ const b = curRep.chart.bars; return b[b.length - 1].time; }
@@ -381,9 +388,10 @@ function sessionAt(t){                      // t = chart time (IST wall clock wr
   const h = Math.floor((((t - 19800) % 86400) + 86400) % 86400 / 3600);
   return SESSIONS.find(([a, b]) => h >= a && h < b);
 }
+const showSessions = rep => rep.intraday && (STEP[rep.tf] || 0) <= 3600;     // a 4-hour candle spans several sessions
 function drawSessions(rep){
   if (!cs.sesS) return;
-  if (!rep.intraday) { cs.sesS.setData([]); cs.sesS.setMarkers([]); return; }
+  if (!showSessions(rep)) { cs.sesS.setData([]); cs.sesS.setMarkers([]); return; }
   const data = [], marks = [];
   let prev = null;
   for (const b of rep.chart.bars) {
@@ -400,7 +408,7 @@ function drawSessions(rep){
 function drawForming(){
   candles.update({time: fc.time, open: fc.open, high: fc.high, low: fc.low, close: fc.close});
   if (cs.tickS && fc.ticks) cs.tickS.update({time: fc.time, value: fc.ticks});
-  if (cs.sesS && curRep && curRep.intraday) cs.sesS.update({time: fc.time, value: 1, color: sessionAt(fc.time)[3]});
+  if (cs.sesS && curRep && showSessions(curRep)) cs.sesS.update({time: fc.time, value: 1, color: sessionAt(fc.time)[3]});
   paintVolume();
 }
 function paintVolume(){
@@ -817,8 +825,9 @@ function drawChart(rep){
     chart.priceScale('tick').applyOptions({scaleMargins: {top: 0.78, bottom: 0}, visible: false});
     cs = {key, el, volS, tickS, sesS, e200: chart.addLineSeries({color:'#7c3aed',lineWidth:1.5,title:'EMA 200', lastValueVisible:true}),
           e20: chart.addLineSeries({color:'#f59e0b',lineWidth:1,title:'EMA 20'}), extras: [], priceLines: [], range: null};
-    if (rep.intraday) chart.timeScale().applyOptions({tickMarkFormatter: (t) => { const d = new Date(t*1000); const hh = String(d.getUTCHours()).padStart(2,'0'), mm = String(d.getUTCMinutes()).padStart(2,'0'); return ((hh==='09'&&mm==='15') || (hh==='00'&&mm==='00')) ? `${d.getUTCDate()}/${d.getUTCMonth()+1}` : `${hh}:${mm}`; }});
-    chart.applyOptions({localization:{timeFormatter: (t) => { if (typeof t === 'string') return t; const d = new Date(t*1000); return `${d.getUTCDate()}/${d.getUTCMonth()+1} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; }}});
+    // intraday: day/month on a new day, hh:mm otherwise · daily & weekly: the library's own date ticks
+    if (rep.intraday) chart.timeScale().applyOptions({tickMarkFormatter: (t, type) => { const d = new Date(t*1000); const hh = String(d.getUTCHours()).padStart(2,'0'), mm = String(d.getUTCMinutes()).padStart(2,'0'); return (type < 3 || (hh==='09'&&mm==='15') || (hh==='00'&&mm==='00')) ? `${d.getUTCDate()}/${d.getUTCMonth()+1}` : `${hh}:${mm}`; }});
+    chart.applyOptions({localization:{locale: 'en-GB', timeFormatter: (t) => { if (typeof t === 'string') return t; if (typeof t === 'object') return `${t.day}/${t.month}/${t.year}`; const d = new Date(t*1000); return `${d.getUTCDate()}/${d.getUTCMonth()+1} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; }}});
     // remember the user's zoom/scroll so a refresh doesn't snap it back
     chart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (cs.userMoved) cs.range = r; });
     el.addEventListener('wheel', () => cs.userMoved = true, {passive:true});

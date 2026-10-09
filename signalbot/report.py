@@ -9,16 +9,16 @@ import pandas as pd
 from . import lines as L
 from . import news
 from . import patterns as P
-from .data import SYMBOLS, TIMEFRAMES, load, source_for
+from .data import SYMBOLS, TIMEFRAMES, DAILY, is_intraday, load, source_for
 from .strategy import SETUP_TEXT, SETUPS, Params, backtest, current, enrich, equity_curve, stats
 from .symbols import pf
 
 #: how many bars the chart shows per timeframe
-CHART_BARS = {"1d": 260, "1h": 7 * 60, "15m": 25 * 10, "5m": 75 * 4}
+CHART_BARS = {"1w": 260, "1d": 260, "4h": 300, "1h": 7 * 60, "30m": 300, "15m": 25 * 10, "5m": 75 * 4, "1m": 480}
 
 
 def _t(ts: pd.Timestamp, tf: str):
-    if tf == "1d":
+    if tf in DAILY:
         return ts.strftime("%Y-%m-%d")
     # lightweight-charts wants epoch seconds and displays them as UTC;
     # labelling IST wall-clock time as UTC makes the axis read 09:15, 10:15…
@@ -171,7 +171,8 @@ def _enrich_verdict(v: dict, setups: list[dict], symbol: str, root: Path, tf: st
     v["confluence"] = {"buy": buys, "sell": sells, "of": len(setups)}
     v["session"] = session_now()
     # a signal against the higher timeframes deserves a warning
-    higher = {"5m": ["15m", "1h"], "15m": ["1h", "1d"], "1h": ["1d"], "1d": []}[tf]
+    higher = {"1m": ["5m", "15m"], "5m": ["15m", "1h"], "15m": ["1h", "1d"], "30m": ["1h", "1d"],
+              "1h": ["1d"], "4h": ["1d"], "1d": [], "1w": []}[tf]
     if v.get("state") == "signal":
         want = "up" if v["side"] == "BUY" else "down"
         against = [h for h in higher if tr.get(h) and tr[h] != want]
@@ -265,7 +266,7 @@ def build(symbol: str, root: Path, tf: str = "1d", *, params: Params | None = No
           max_bars: int | None = None, cost: float | None = None) -> dict:
     if tf not in TIMEFRAMES:
         raise ValueError(f"unknown timeframe {tf}")
-    intraday = tf != "1d"
+    intraday = is_intraday(tf)
     meta = SYMBOLS[symbol]
     # gold trades round the clock: positions carry, no session square-off
     p = params or Params(intraday=False, timed=intraday)

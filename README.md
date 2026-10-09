@@ -1,7 +1,7 @@
 # signalbot
 
 What the rules say right now for **spot gold (XAU/USD)**, the same price
-TradingView shows as `OANDA:XAUUSD` give or take the spread, on **daily, hourly, 15-minute and 5-minute**
+TradingView shows as `OANDA:XAUUSD` give or take the spread, on **1-minute, 5-minute, 15-minute, 30-minute, hourly, 4-hour, daily and weekly**
 candles. Each rule gives BUY / SELL / NO TRADE with *from → to → stop* levels,
 next to how those exact rules have done across every bar on record. It runs as a
 local web page, a CLI, and optional Telegram alerts.
@@ -59,9 +59,13 @@ The **Liquidity / SMC** switch on the chart draws the previous day's high/low, e
 
 **Spread.** Every backtested trade pays a round-trip spread (default $0.30, editable in the toolbar), because scalping results without costs flatter every rule.
 
+**Timeframes.** 1m, 5m, 15m, 1H and 1D come from Twelve Data. 30m, 4H and 1W are built from 15m, 1H and 1D candles (4H on the UTC grid like TradingView, weeks start Monday), so they cost no extra credits. The 1-minute chart uses the shared 1-minute cache, deepened once a day to about a week of candles (2 credits). On Streamlit Cloud, watching 1m pulls the newest minute about once a minute (1 credit each), so leave it on 5m or higher when you are not scalping.
+
 **Market hours only.** Twelve Data keeps publishing XAU/USD candles over the weekend and in the daily 17:00–18:00 New York break: synthetic, flat prices with about $0.25 of jitter. They were about 30% of the 5-minute history, so signalbot drops every candle from when gold isn't trading (Fri 17:00 → Sun 18:00 New York, plus the daily break).
 
-**Scoreboard.** Directly under the chart, every rule is ranked by its average result per trade after the spread, with its last-30-days record next to it, so you can see which edges are still working. The banner above the chart also shows the trend on all four timeframes, how many rules agree right now, the trading session, and a warning when a signal goes against the higher-timeframe trend.
+**Layout.** The chart is at the top, with all eight timeframe buttons on it. The verdict banner, rule settings, scoreboard and cards are below.
+
+**Scoreboard.** Below the chart, every rule is ranked by its average result per trade after the spread, with its last-30-days record next to it, so you can see which edges are still working. The banner under the chart also shows the 200 EMA trend on 1D, 1H, 15m and 5m, how many rules agree right now, the trading session, and a warning when a signal goes against the higher-timeframe trend.
 | **trendline break** | A close through a trendline that price had respected, traded in the direction of the break. |
 | **channel bounce** | Inside a parallel channel, a bar that touches one line and closes back inside, traded toward the other line. |
 

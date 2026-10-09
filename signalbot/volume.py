@@ -29,8 +29,11 @@ import pandas as pd
 log = logging.getLogger("signalbot.volume")
 
 TICKER = "GC=F"
-YF = {"5m": ("5m", "60d"), "15m": ("15m", "60d"), "1h": ("60m", "730d"), "1d": ("1d", "max")}
-MAX_AGE = {"5m": 120, "15m": 180, "1h": 600, "1d": 6 * 3600}
+YF = {"1m": ("1m", "7d"), "5m": ("5m", "60d"), "15m": ("15m", "60d"), "30m": ("30m", "60d"),
+      "1h": ("60m", "730d"), "1d": ("1d", "max")}
+MAX_AGE = {"1m": 90, "5m": 120, "15m": 180, "30m": 300, "1h": 600, "1d": 6 * 3600}
+#: timeframes Yahoo doesn't serve: summed up from a lower one
+FROM = {"4h": "1h", "1w": "1d"}
 RVOL_N = 20
 
 
@@ -103,9 +106,15 @@ def attach(df: pd.DataFrame, root: Path, tf: str, refresh: bool = True, symbol: 
         d.attrs["vol_label"] = "exchange volume"
         return d
     ticker = FUTURES_VOLUME.get(meta.get("td"))
-    v = comex(root, tf, refresh=refresh, ticker=ticker) if ticker else pd.Series(dtype=float)
+    v = comex(root, FROM.get(tf, tf), refresh=refresh, ticker=ticker) if ticker else pd.Series(dtype=float)
+    if len(v) and tf == "4h":                                  # hourly prints → the 4-hour candle they fall in
+        utc = v.index - pd.Timedelta(hours=5, minutes=30)
+        v = v.groupby(utc.floor("4h") + pd.Timedelta(hours=5, minutes=30)).sum()
+    elif len(v) and tf == "1w":                                # daily prints → their Monday-labelled week
+        days = pd.DatetimeIndex(v.index).normalize()
+        v = v.groupby(days - pd.to_timedelta(days.weekday, unit="D")).sum()
     d.attrs["vol_label"] = f"{ticker} futures" if ticker else "tick volume"
-    if tf == "1d":
+    if tf in ("1d", "1w"):
         key = pd.DatetimeIndex(d.index.normalize())          # spot daily candle → its date
         d["vol"] = v.reindex(key).to_numpy() if len(v) else np.nan
     else:

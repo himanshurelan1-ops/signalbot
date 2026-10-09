@@ -81,6 +81,9 @@ COMP_DIR.mkdir(exist_ok=True)
 shutil.copyfile(ROOT / "signalbot" / "web_ui.html", COMP_DIR / "index.html")
 signalbot_page = components.declare_component("signalbot_page", path=str(COMP_DIR))
 
+# ── the chart goes first on the page; the rule settings sit below it ──
+page = st.container()
+
 # ── rule settings ──
 with st.expander("⚙️ Rule settings", expanded=False):
     c1, c2, c3, c4, c5 = st.columns(5)
@@ -128,7 +131,9 @@ def _bucket(tf: str) -> str:
     now = pd.Timestamp.now(tz="UTC")
     if tf == "1d":
         return str(now.date())
-    step = {"1h": "1h", "15m": "15min", "5m": "5min"}[tf]
+    if tf == "1w":
+        return str((now - pd.Timedelta(days=now.weekday())).date())
+    step = {"4h": "4h", "1h": "1h", "30m": "30min", "15m": "15min", "5m": "5min", "1m": "1min"}[tf]
     return str(now.floor(step))
 
 
@@ -170,14 +175,15 @@ def report_for(symbol: str, tf: str) -> dict:
 
 
 try:
-    with st.spinner(f"Replaying the rules on the latest {SYMBOLS[symbol]['short']} candles…"):
+    with page, st.spinner(f"Replaying the rules on the latest {SYMBOLS[symbol]['short']} candles…"):
         rep = report_for(symbol, tf)
 except Exception as e:
-    st.error(f"Could not build the report: {type(e).__name__}: {e}")
+    page.error(f"Could not build the report: {type(e).__name__}: {e}")
     st.stop()
 
 have = {v["td"] for v in SYMBOLS.values()}
 meta = {"symbols": [{"symbol": k, "name": v["name"], "short": v["short"], "kind": v["kind"], "td": v["td"]} for k, v in SYMBOLS.items()],
         "popular": [{"td": t, "name": n, "type": ty, "added": t in have} for t, n, ty in SY.POPULAR],
-        "timeframes": [{"tf": k, "label": v["label"]} for k, v in TIMEFRAMES.items()]}
-signalbot_page(report=rep, meta=meta, search=search, td_key=os.environ["TWELVEDATA_API_KEY"], key="sb", default=None, height=900)
+        "timeframes": [{"tf": k, "label": v["label"], "short": v["short"]} for k, v in TIMEFRAMES.items()]}
+with page:
+    signalbot_page(report=rep, meta=meta, search=search, td_key=os.environ["TWELVEDATA_API_KEY"], key="sb", default=None, height=900)

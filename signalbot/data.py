@@ -22,11 +22,23 @@ def available_symbols(root: Path) -> dict:
 
 #: timeframes we support
 TIMEFRAMES = {
-    "1d":  {"interval": "1d",  "period": "max",  "label": "Daily",  "bars_per_day": 1},
-    "1h":  {"interval": "60m", "period": "730d", "label": "1 hour", "bars_per_day": 7},
-    "15m": {"interval": "15m", "period": "60d",  "label": "15 min", "bars_per_day": 25},
-    "5m":  {"interval": "5m",  "period": "60d",  "label": "5 min",  "bars_per_day": 75},
+    "1m":  {"label": "1 min",  "short": "1m"},
+    "5m":  {"label": "5 min",  "short": "5m"},
+    "15m": {"label": "15 min", "short": "15m"},
+    "30m": {"label": "30 min", "short": "30m"},
+    "1h":  {"label": "1 hour", "short": "1H"},
+    "4h":  {"label": "4 hour", "short": "4H"},
+    "1d":  {"label": "Daily",  "short": "1D"},
+    "1w":  {"label": "Weekly", "short": "1W"},
 }
+#: timeframes built from a lower one instead of downloaded (no extra API credits)
+DERIVED = {"30m": "15m", "4h": "1h", "1w": "1d"}
+#: candles labelled by date, not time
+DAILY = ("1d", "1w")
+
+
+def is_intraday(tf: str) -> bool:
+    return tf not in DAILY
 
 
 
@@ -46,7 +58,7 @@ def _normalise(df: pd.DataFrame) -> pd.DataFrame:
     return df[~df.index.duplicated(keep="last")].sort_index()
 
 
-BAR_MINUTES = {"1h": 60, "15m": 15, "5m": 5}
+BAR_MINUTES = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240}
 
 
 def drop_incomplete(df: pd.DataFrame, interval: str, now: pd.Timestamp | None = None,
@@ -59,6 +71,9 @@ def drop_incomplete(df: pd.DataFrame, interval: str, now: pd.Timestamp | None = 
     last = df.index[-1]
     if interval == "1d":
         closes_at = last + pd.Timedelta(days=1)        # a daily candle is labelled by its start
+    elif interval == "1w":                             # Monday-labelled; done when the week's trading ends
+        crypto = SYMBOLS.get(symbol, {}).get("kind") == "crypto"
+        closes_at = last + pd.Timedelta(days=7 if crypto else 5)
     else:
         closes_at = last + pd.Timedelta(minutes=BAR_MINUTES[interval])
     return df.iloc[:-1] if now < closes_at else df
@@ -68,6 +83,7 @@ def drop_incomplete(df: pd.DataFrame, interval: str, now: pd.Timestamp | None = 
 #: built from the shared 1-minute cache (twelvedata.REFRESH), so they cost no
 #: extra credits; the daily candle is asked for directly, once an hour.
 MAX_AGE_LIVE = {"1d": 60 * 60, "1h": 30, "15m": 30, "5m": 30}
+MINUTE_HISTORY = 8000          # 1-minute candles wanted for the 1 min chart and its backtest (~1 week)
 
 
 def load(symbol: str, interval: str, root: Path, refresh: bool = True) -> pd.DataFrame:
@@ -75,6 +91,14 @@ def load(symbol: str, interval: str, root: Path, refresh: bool = True) -> pd.Dat
     The bar still in progress is never returned (see drop_incomplete)."""
     meta = SYMBOLS[symbol]
     kind = meta.get("kind", "metal")
+    from . import twelvedata
+    if interval in DERIVED:
+        base = load(symbol, DERIVED[interval], root, refresh=refresh)     # closed candles only
+        out = twelvedata.resample_tf(base, interval, kind)
+        return drop_incomplete(out, interval, symbol=symbol)
+    if interval == "1m":                     # the shared 1-minute cache the stream and the other timeframes use
+        m1 = twelvedata.minute_history(root, symbol=meta["td"], kind=kind, want=MINUTE_HISTORY, refresh=refresh)
+        return drop_incomplete(twelvedata.market_hours_only(m1, "1m", kind), "1m", symbol=symbol)
     p = _cache_path(root, symbol, interval)
     cached = None
     if p.exists():

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .data import SYMBOLS, TIMEFRAMES, BAR_MINUTES, load
+from .data import SYMBOLS, TIMEFRAMES, BAR_MINUTES, DAILY, load
 
 log = logging.getLogger("signalbot.live")
 
@@ -55,9 +55,10 @@ def forming_candle(root: Path, symbol: str, tf: str) -> dict:
     closed = load(symbol, tf, root, refresh=False)
     last = closed.index[-1]
     now = pd.Timestamp.now(tz="Asia/Kolkata").tz_localize(None)
-    if tf == "1d":
-        start = last + pd.Timedelta(days=1)          # daily candles are labelled by their start
-        label = str((last + pd.Timedelta(days=1)).date())
+    if tf in DAILY:
+        span = pd.Timedelta(days=7 if tf == "1w" else 1)
+        start = last + span                          # daily / weekly candles are labelled by their start
+        label = str(start.date())
         seg = m1[m1.index > start]
         t_out = label
     else:
@@ -81,7 +82,7 @@ def forming_candle(root: Path, symbol: str, tf: str) -> dict:
                 "ticks": float(seg["volume"].sum())}
     # every bucket after the last cached closed candle that the day's 1-minute
     # bars can rebuild — so the chart has no hole while the main cache catches up
-    if tf != "1d":
+    if tf not in DAILY:
         step = pd.Timedelta(minutes=BAR_MINUTES[tf])
         b = last + step
         while b <= start:

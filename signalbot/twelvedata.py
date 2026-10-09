@@ -49,7 +49,7 @@ BACKFILL_PAGES = {"1d": 2, "1h": 5, "15m": 8, "5m": 10}
 #: their caches then grow every day signalbot runs
 NEW_MARKET_PAGES = {"1d": 1, "1h": 2, "15m": 2, "5m": 3}
 PER_MINUTE = 8
-MINUTE_KEEP = 6000              # 1-minute bars kept on disk (~4 days)
+MINUTE_KEEP = 12000             # 1-minute bars kept on disk (~9 trading days)
 
 _lock = threading.RLock()
 _ledger_lock = threading.Lock()
@@ -356,6 +356,75 @@ def resample(m1: pd.DataFrame, interval: str, origin: pd.Timestamp | None = None
     return out
 
 
+def fresh_minutes(root: Path, symbol: str = SYMBOL, kind: str = "metal") -> pd.DataFrame:
+    """The 1-minute cache, made sure to hold the minute that just closed."""
+    m1 = minute_bars(root, symbol=symbol, kind=kind)
+    # no live stream on this server (e.g. Streamlit Cloud) and the cache is missing the minutes
+    # that just closed: pull them now, so a candle is never judged on half its data (1 credit)
+    now_min = pd.Timestamp.now(tz=IST).tz_localize(None).floor("1min")
+    if (not m1.empty and m1.index[-1] < now_min - pd.Timedelta(minutes=1)
+            and not market_closed(kind=kind) and not _stream_live(symbol)):
+        m1 = minute_bars(root, force=True, symbol=symbol, kind=kind)
+    return m1
+
+
+def minute_history(root: Path, symbol: str = SYMBOL, kind: str = "metal", want: int = 8000,
+                   refresh: bool = True) -> pd.DataFrame:
+    """1-minute candles for the 1 min chart: the live cache, deepened once a day to ~`want` bars
+    by paging further back (1 credit per 5,000 bars)."""
+    m1 = fresh_minutes(root, symbol, kind) if refresh else (_read_minutes(root, symbol)
+                                                            if _read_minutes(root, symbol) is not None
+                                                            else minute_bars(root, symbol=symbol, kind=kind))
+    stamp = root / "data" / f".{_key(symbol)}_1m.deep"
+    tried = stamp.exists() and time.time() - stamp.stat().st_mtime < 86400
+    if refresh and len(m1) < want * 0.8 and not tried:
+        stamp.parent.mkdir(parents=True, exist_ok=True)
+        stamp.touch()
+        frames, end = [], m1.index[0] - pd.Timedelta(seconds=1)
+        for _ in range(max(1, -(-(want - len(m1)) // MAX_OUT))):
+            try:
+                old = time_series(root, "1m", MAX_OUT, end=end, symbol=symbol)
+            except Exception as e:
+                log.info("deeper 1-minute history unavailable: %s", e)
+                break
+            if old.empty:
+                break
+            frames.append(old)
+            end = old.index[0] - pd.Timedelta(seconds=1)
+        if frames:
+            with _lock:
+                cur = _read_minutes(root, symbol)
+                cur = m1 if cur is None else cur
+                old = pd.concat(frames)
+                df = pd.concat([old[old.index < cur.index[0]], cur])
+                df = df[~df.index.duplicated(keep="last")].sort_index().iloc[-max(MINUTE_KEEP, want):]
+                df.to_csv(_minute_path(root, symbol))
+                m1 = df
+    return m1
+
+
+def resample_tf(df: pd.DataFrame, tf: str, kind: str = "metal") -> pd.DataFrame:
+    """30 min from 15 min, 4 hour from 1 hour, weekly from daily candles."""
+    if df is None or df.empty:
+        return df
+    agg = {"open": "first", "high": "max", "low": "min", "close": "last"}
+    agg |= {c: "sum" for c in ("volume",) if c in df}
+    if tf == "1w":                                   # weeks start Monday, labelled by that Monday
+        out = df.resample("W-MON", label="left", closed="left").agg(agg).dropna(subset=["open"])
+        out.index.name = "time"
+        return out
+    rule = {"30m": "30min", "4h": "4h"}[tf]
+    utc = df.copy()
+    utc.index = utc.index.tz_localize(IST).tz_convert("UTC")
+    # on the UTC grid (00:00, 04:00 … like TradingView); 4-hour candles keep the minute their hourly
+    # candles start on (US stocks: :30)
+    off = pd.Timedelta(minutes=int(utc.index[0].minute)) if tf == "4h" else pd.Timedelta(0)
+    out = utc.resample(rule, label="left", closed="left", origin="epoch", offset=off).agg(agg).dropna(subset=["open"])
+    out.index = out.index.tz_convert(IST).tz_localize(None)
+    out.index.name = "time"
+    return out
+
+
 def update(root: Path, interval: str, cached: pd.DataFrame | None, symbol: str = SYMBOL,
            kind: str = "metal") -> pd.DataFrame:
     """Full candle history for `interval`: backfill once, then cheap top-ups."""
@@ -366,13 +435,7 @@ def update(root: Path, interval: str, cached: pd.DataFrame | None, symbol: str =
         n = (pd.Timestamp.now(tz=IST).tz_localize(None) - last).days + 3
         new = time_series(root, "1d", max(5, min(MAX_OUT, n)), symbol=symbol)
     else:
-        m1 = minute_bars(root, symbol=symbol, kind=kind)
-        # no live stream on this server (e.g. Streamlit Cloud) and the cache is missing the minutes
-        # that just closed: pull them now, so a candle is never judged on half its data (1 credit)
-        now_min = pd.Timestamp.now(tz=IST).tz_localize(None).floor("1min")
-        if (not m1.empty and m1.index[-1] < now_min - pd.Timedelta(minutes=1)
-                and not market_closed(kind=kind) and not _stream_live(symbol)):
-            m1 = minute_bars(root, force=True, symbol=symbol, kind=kind)
+        m1 = fresh_minutes(root, symbol, kind)
         if not m1.empty and m1.index[0] <= last:
             new = resample(m1[m1.index >= last], interval, origin=last)
         else:                                   # gap longer than the 1-minute cache: ask for the bars directly
